@@ -247,15 +247,18 @@ table.tbl th{font-weight:600;color:var(--muted)}
 .hgrid th{font-weight:600;color:var(--muted);text-align:center;padding:0 1px;line-height:1.2}
 .hgrid th.today{color:var(--rose)}
 .hgrid td.nm{position:sticky;left:0;background:var(--surface);z-index:1;min-width:150px;max-width:190px;padding-right:8px}
-.hgrid td.nm div{display:flex;justify-content:space-between;align-items:center;gap:6px;font-weight:600;font-size:13px}
-.hgrid td.nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hgrid .pb{height:4px;background:var(--line);border-radius:3px;margin-top:4px}
+.hgrid td.nm .hn{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:600;font-size:13px;line-height:1.25;text-align:left;overflow-wrap:anywhere}
+.hgrid td.nm .hm{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:11.5px}
+.hgrid .pb{flex:1;min-width:24px;height:4px;background:var(--line);border-radius:3px;overflow:hidden}
 .hgrid .pb i{display:block;height:100%;background:var(--ok);border-radius:3px}
+.hgrid td.nm .x{font-size:15px;padding:0 4px}
 .hc{width:24px;height:24px;border-radius:6px;border:1.5px solid var(--line);background:var(--surface);padding:0;display:grid;place-items:center}
 .hc[aria-checked="true"]{background:var(--ok);border-color:var(--ok)}
 .hc[aria-checked="true"]::after{content:"";width:9px;height:5px;border:2px solid #fff;border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-1px)}
 .hc.today{border-color:var(--rose);border-width:2px}
 .hc:disabled{opacity:.35;cursor:default}
+.hgrid th.nmh{text-align:left;position:sticky;left:0;background:var(--surface);z-index:2}
+@media (max-width:600px){.hgrid td.nm{min-width:108px;max-width:124px;font-size:12.5px}.hc{width:30px;height:30px}}
 
 /* goals */
 .goals{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:14px}
@@ -428,6 +431,8 @@ const dmY = d => `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`
 const dm = d => `${pad(d.getDate())}/${pad(d.getMonth()+1)}`;
 const uid = (p = 't') => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const clone = o => JSON.parse(JSON.stringify(o));
+/** Chuỗi so sánh không phụ thuộc thứ tự khóa (kho dữ liệu có thể trả về khóa theo thứ tự khác). */
+const canon = (v) => v === null || typeof v !== 'object' ? JSON.stringify(v) : Array.isArray(v) ? `[${v.map(canon).join(',')}]` : `{${Object.keys(v).sort().filter((k) => v[k] !== undefined).map((k) => JSON.stringify(k) + ':' + canon(v[k])).join(',')}}`;
 const RE_DATE = /^\d{4}-\d{2}-\d{2}$/, RE_TIME = /^\d{2}:\d{2}$/;
 const LEARN_N = 3;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -614,7 +619,7 @@ function toggleHabit(id, ds) {
   const h = S.habits.get(id); if (!h || ds > today()) return; const before = dayProgress().p;
   h.done = Object.assign({}, h.done || {}); const was = !!h.done[ds];
   if (was) delete h.done[ds]; else h.done[ds] = 1;
-  put('habits', h); render(); if (!was && ds === today()) afterToggle(before);
+  put('habits', h); if (!patchHabits(id, ds)) render(); if (!was && ds === today()) afterToggle(before);
 }
 function addHabit(name) { name = String(name || '').trim().slice(0, 60); if (!name) return; put('habits', { id: uid('h'), name, createdAt: Date.now(), start: today(), order: Date.now(), done: {} }); render(); }
 
@@ -978,12 +983,11 @@ function cssPaint(html) {
     return `<${tag}${withStyle}${sl ? ' /' : ''}>`;
   });
 }
-function drawCharts() {
-  document.querySelectorAll('[data-chart]').forEach(el => {
-    const k = el.dataset.chart, sp = CH[k]; if (!sp) return; const W = Math.max(240, el.clientWidth); const mode = S.chartMode[k] || 'line';
-    el.innerHTML = mode === 'table' ? (sp.table ? sp.table() : tableHtml(sp)) : cssPaint(sp.type === 'radar' ? radarSvg(sp, W) : sp.type === 'stack' ? stackSvg(sp, W) : sp.type === 'hist' ? histSvg(sp, W) : svgChart(sp, W, mode));
-  });
+function drawChart(el) {
+  const k = el.dataset.chart, sp = CH[k]; if (!sp) return; const W = Math.max(240, el.clientWidth); const mode = S.chartMode[k] || 'line';
+  el.innerHTML = mode === 'table' ? (sp.table ? sp.table() : tableHtml(sp)) : cssPaint(sp.type === 'radar' ? radarSvg(sp, W) : sp.type === 'stack' ? stackSvg(sp, W) : sp.type === 'hist' ? histSvg(sp, W) : svgChart(sp, W, mode));
 }
+function drawCharts() { document.querySelectorAll('[data-chart]').forEach(drawChart); }
 function ring(p, size = 72, stroke = 8, label) {
   const r = (size - stroke) / 2, c = 2 * Math.PI * r, off = c * (1 - clamp(p, 0, 100) / 100);
   return cssPaint(`<div class="ring" style="width:${size}px;height:${size}px"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
@@ -1492,30 +1496,55 @@ function viewWeek() {
       return `<section class="card sk wcol${ds === t ? ' is-today' : ''}"><div class="card-h"><h3>${WD[d.getDay()]}</h3><span class="date-tag num">${dm(d)}</span></div>
         ${it.length ? listHtml(it, ds, { compact: true }) : '<p class="hint">Trống</p>'}${addForm('task', 'Thêm việc…', `data-date="${ds}"`)}</section>`; }).join('')}</div>`;
 }
-function viewHabits() {
+function habitsModel() {
   const m0 = S.habitMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1); S.habitMonth = m0;
   const y = m0.getFullYear(), m = m0.getMonth(), nd = new Date(y, m + 1, 0).getDate(), t = today();
   const days = Array.from({ length: nd }, (_, i) => ymd(new Date(y, m, i + 1))), hs = habits();
   let tDone = 0, tTot = 0, bestStreak = { n: 0, name: '' }, steady = { p: -1, name: '' };
-  const rowsH = hs.map(h => { let d = 0, tot = 0, run = 0, br = 0;
+  const rows = hs.map(h => { let d = 0, tot = 0, run = 0, br = 0;
     days.forEach(ds => { if (ds > t || !habitActive(h, ds)) { run = 0; return; } tot++; if (habitDone(h, ds)) { d++; run++; br = Math.max(br, run); } else run = 0; });
     tDone += d; tTot += tot; const p = pct(d, tot); if (br > bestStreak.n) bestStreak = { n: br, name: h.name }; if (tot && p > steady.p) steady = { p, name: h.name };
-    return `<tr><td class="nm"><div><span title="${esc(h.name)}">${esc(h.name)}</span><span class="num muted">${p}%</span><button class="x" data-act="habit-del" data-id="${esc(h.id)}" aria-label="Xóa thói quen ${esc(h.name)}">×</button></div><div class="pb"><i style="width:${p}%"></i></div></td>
-      ${days.map(ds => `<td><button class="hc${ds === t ? ' today' : ''}" role="checkbox" aria-checked="${habitDone(h, ds)}" data-act="habit" data-id="${esc(h.id)}" data-date="${ds}" ${ds > t || !habitActive(h, ds) ? 'disabled' : ''} aria-label="${esc(h.name + ' ngày ' + dm(parseYmd(ds)))}"></button></td>`).join('')}</tr>`; }).join('');
+    return { h, p }; });
   const upto = days.filter(ds => ds <= t);
   const spec = { labels: upto.map(ds => String(parseYmd(ds).getDate())), full: upto.map(ds => fmtDate(ds)), xName: 'Ngày', hl: upto.indexOf(t),
     series: [{ name: 'Đã xong', color: '--s1', values: upto.map(ds => habitDay(ds).done) }, { name: 'Tổng thói quen', color: '--s2', values: upto.map(ds => habitDay(ds).total) }],
     tip: i => { const c = habitDay(upto[i]); return `${fmtDate(upto[i])}: ${c.done}/${c.total} thói quen`; }, aria: 'Mức hoàn thành thói quen theo ngày' };
+  return { m0, y, m, t, days, hs, rows, tDone, tTot, bestStreak, steady, upto, spec };
+}
+const habitRowHtml = (h, p, days, t) => `<tr data-hid="${esc(h.id)}"><td class="nm"><span class="hn" title="${esc(h.name)}">${esc(h.name)}</span><div class="hm"><span class="pb"><i style="width:${p}%"></i></span><span class="num muted">${p}%</span><button class="x" data-act="habit-del" data-id="${esc(h.id)}" aria-label="Xóa thói quen ${esc(h.name)}">×</button></div></td>
+  ${days.map(ds => `<td><button class="hc${ds === t ? ' today' : ''}" role="checkbox" aria-checked="${habitDone(h, ds)}" data-act="habit" data-id="${esc(h.id)}" data-date="${ds}" ${ds > t || !habitActive(h, ds) ? 'disabled' : ''} aria-label="${esc(h.name + ' ngày ' + dm(parseYmd(ds)))}"></button></td>`).join('')}</tr>`;
+const habitKpisHtml = (M) => `<div class="kpis" id="hb-kpis"><div class="kpi"><span class="lbl">Cả tháng</span><span class="val num">${pct(M.tDone, M.tTot)}%</span><span class="d num">${M.tDone}/${M.tTot} lần tích</span></div>
+      <div class="kpi"><span class="lbl">Chuỗi dài nhất</span><span class="val num">${M.bestStreak.n}<small> ngày</small></span><span class="d">${esc(M.bestStreak.name || '—')}</span></div>
+      <div class="kpi"><span class="lbl">Đều đặn nhất</span><span class="val" style="font-size:19px">${esc(M.steady.name || '—')}</span><span class="d num">${M.steady.p >= 0 ? M.steady.p + '%' : ''}</span></div></div>`;
+function viewHabits() {
+  const M = habitsModel(), { m0, y, m, t, days, hs } = M;
   return `<section class="card sk"><div class="card-h"><div><h2>Theo dõi thói quen</h2><span class="hint">Tháng ${m + 1}/${y}</span></div>
       <div class="navpill"><button class="btn" data-act="hb-prev" aria-label="Tháng trước">‹</button><button class="btn sm" data-act="hb-now">Tháng này</button><button class="btn" data-act="hb-next" aria-label="Tháng sau">›</button></div></div>
-    <div class="kpis"><div class="kpi"><span class="lbl">Cả tháng</span><span class="val num">${pct(tDone, tTot)}%</span><span class="d num">${tDone}/${tTot} lần tích</span></div>
-      <div class="kpi"><span class="lbl">Chuỗi dài nhất</span><span class="val num">${bestStreak.n}<small> ngày</small></span><span class="d">${esc(bestStreak.name || '—')}</span></div>
-      <div class="kpi"><span class="lbl">Đều đặn nhất</span><span class="val" style="font-size:19px">${esc(steady.name || '—')}</span><span class="d num">${steady.p >= 0 ? steady.p + '%' : ''}</span></div></div></section>
-    ${upto.length && hs.length ? chartCard('habits', 'Mức hoàn thành theo ngày', spec) : ''}
-    <section class="card sk"><div class="card-h"><h2>Bảng theo dõi</h2></div>
-      ${hs.length ? `<div class="tbl-wrap"><table class="hgrid num"><thead><tr><th style="text-align:left">Thói quen</th>${days.map(ds => { const d = parseYmd(ds); return `<th class="${ds === t ? 'today' : ''}">${WDS[d.getDay()]}<br>${d.getDate()}</th>`; }).join('')}</tr></thead><tbody>${rowsH}</tbody></table></div>`
+    ${habitKpisHtml(M)}</section>
+    ${M.upto.length && hs.length ? chartCard('habits', 'Mức hoàn thành theo ngày', M.spec) : ''}
+    <section class="card sk"><div class="card-h"><h2>Bảng theo dõi</h2>${hs.length && days.includes(t) ? '<button class="btn ghost sm" data-act="hb-jump">Về hôm nay</button>' : ''}</div>
+      ${hs.length ? `<div class="tbl-wrap" data-keepx="hgrid-${ymd(m0)}"><table class="hgrid num"><thead><tr><th class="nmh">Thói quen</th>${days.map(ds => { const d = parseYmd(ds); return `<th class="${ds === t ? 'today' : ''}">${WDS[d.getDay()]}<br>${d.getDate()}</th>`; }).join('')}</tr></thead><tbody>${M.rows.map(r => habitRowHtml(r.h, r.p, days, t)).join('')}</tbody></table></div>`
         : '<div class="empty">Chưa có thói quen nào.</div>'}
       ${addForm('habit', 'Thêm thói quen mới, ví dụ: Thiền 10 phút')}</section>`;
+}
+/** Tick thói quen ở trang Thói quen: chỉ cập nhật dòng đó, ô thống kê và biểu đồ; không vẽ lại cả trang (giữ nguyên chỗ đang xem). */
+function patchHabits(id, ds) {
+  if (S.view !== 'habits') return false;
+  const kp = $('#hb-kpis'), tr = document.querySelector(`tr[data-hid="${CSS.escape(id)}"]`);
+  if (!kp || !tr) return false;
+  const M = habitsModel(), row = M.rows.find(r => r.h.id === id); if (!row) return false;
+  kp.outerHTML = habitKpisHtml(M);
+  tr.outerHTML = habitRowHtml(row.h, row.p, M.days, M.t);
+  const plot = document.querySelector('[data-chart="habits"]'); if (plot) { CH.habits = M.spec; drawChart(plot); }
+  const btn = document.querySelector(`.hc[data-id="${CSS.escape(id)}"][data-date="${ds}"]`); if (btn) btn.focus({ preventScroll: true });
+  renderNav(); return true;
+}
+/** Kéo ngang bảng thói quen sao cho cột hôm nay nằm trong tầm nhìn (sát phải, chừa 2 cột). */
+function scrollHabitsToToday() {
+  const w = document.querySelector('[data-keepx^="hgrid-"]'), th = w && w.querySelector('th.today'), nm = w && w.querySelector('th.nmh');
+  if (!w || !th) return;
+  w.scrollLeft = Math.max(0, th.offsetLeft + th.offsetWidth * 3 - w.clientWidth);
+  if (nm && th.offsetLeft - w.scrollLeft < nm.offsetWidth) w.scrollLeft = Math.max(0, th.offsetLeft - nm.offsetWidth - th.offsetWidth);
 }
 function viewGoals() {
   const gs = [...S.goals.values()].sort((a, b) => (!!a.done - !!b.done) || (a.deadline || '9999').localeCompare(b.deadline || '9999'));
@@ -1656,7 +1685,14 @@ function render() {
   const el = $('#view');
   if (S.loading) { el.innerHTML = `<div class="empty"><span class="busy" style="justify-content:center"><span class="spin"></span>Đang mở sổ của bạn…</span></div>`; return; }
   const fn = { today: viewToday, cal: viewCal, week: viewWeek, habits: viewHabits, goals: viewGoals, year: viewYear, stats: viewStats, debt: viewDebt, cats: viewCats, settings: viewSettings }[S.view] || viewToday;
+  const same = S.lastView === S.view, y = window.scrollY, xs = {};
+  if (same) document.querySelectorAll('[data-keepx]').forEach(b => { xs[b.dataset.keepx] = b.scrollLeft; });
+  el.style.minHeight = same ? el.offsetHeight + 'px' : '';
   el.innerHTML = fn(); drawCharts();
+  document.querySelectorAll('[data-keepx]').forEach(b => { if (b.dataset.keepx in xs) b.scrollLeft = xs[b.dataset.keepx]; else if (b.dataset.keepx.startsWith('hgrid-')) scrollHabitsToToday(); });
+  el.style.minHeight = '';
+  if (same && Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y);
+  S.lastView = S.view;
 }
 
 /* ================= celebration ================= */
@@ -1814,6 +1850,7 @@ document.addEventListener('click', e => {
     case 'wk-now': S.weekStart = null; render(); break;
     case 'hb-prev': case 'hb-next': { const m = S.habitMonth; S.habitMonth = new Date(m.getFullYear(), m.getMonth() + (act === 'hb-next' ? 1 : -1), 1); render(); break; }
     case 'hb-now': S.habitMonth = null; render(); break;
+    case 'hb-jump': scrollHabitsToToday(); break;
     case 'yr-prev': case 'yr-next': S.year += act === 'yr-next' ? 1 : -1; render(); break;
     case 'yr-now': S.year = new Date().getFullYear(); render(); break;
     case 'yr-month': { const m = +el.dataset.m; S.openMonth = S.openMonth === m ? 0 : m; render(); break; }
@@ -1919,11 +1956,14 @@ async function boot() {
     db = dbNs; S.mode = 'db'; const seen = new Set();
     const timer = setTimeout(() => { if (S.loading) { S.loading = false; updateCaptureUI(); render(); toast('Mạng chậm nên dữ liệu cũ chưa hiện hết. Bạn vẫn ghi việc mới được.'); } }, 10000);
     db.doc('meta/debt').onSnapshot((snap) => { if (snap.metadata && snap.metadata.hasPendingWrites) return; const w = writers.get('debtcfg'); if (w && (w.running || w.next)) return; VS.doc = snap.exists ? snap.data() : null; applyVaultDoc(); }, () => { if (VS.doc === undefined) { VS.doc = null; applyVaultDoc(); } });
-    db.doc('meta/settings').onSnapshot(snap => { if (snap.exists) { S.settings = mergeSettings(snap.data()); applyTheme(); } if (!S.loading) render(); }, () => {});
+    db.doc('meta/settings').onSnapshot(snap => { if (!snap.exists) return; const next = mergeSettings(snap.data()); if (canon(next) === canon(S.settings)) return; S.settings = next; applyTheme(); if (!S.loading) render(); }, () => {});
     COLLS.forEach(c => db.collection(c).onSnapshot(snap => {
-      const m = new Map(); snap.docs.forEach(d => { const o = d.data(); if (o && o.id) m.set(o.id, Object.assign({}, o)); }); S[c] = m; seen.add(c);
-      if (S.loading && seen.size === COLLS.length) { clearTimeout(timer); S.loading = false; updateCaptureUI(); }
-      if (!S.loading) render();
+      const m = new Map(); snap.docs.forEach(d => { const o = d.data(); if (o && o.id) m.set(o.id, Object.assign({}, o)); });
+      let changed = m.size !== S[c].size;
+      if (!changed) for (const [k, o] of m) { const cur = S[c].get(k); if (!cur || canon(cur) !== canon(o)) { changed = true; break; } }
+      S[c] = m; seen.add(c);
+      if (S.loading && seen.size === COLLS.length) { clearTimeout(timer); S.loading = false; updateCaptureUI(); changed = true; }
+      if (!S.loading && changed) render();
     }, () => { if (S.loading && c === 'tasks') { clearTimeout(timer); S.mode = 'local'; db = null; loadLocal(); S.loading = false; updateCaptureUI(); render(); toast('Không mở được dữ liệu trên tài khoản, đang dùng bộ nhớ của máy này.'); } }));
   } else { S.mode = 'local'; loadLocal(); applyTheme(); S.loading = false; try { const kv = JSON.parse(localStorage.getItem('skh-debt-kv') || 'null'); const old = JSON.parse(localStorage.getItem('skh-debt') || 'null'); VS.doc = kv ? { kv } : old; } catch { VS.doc = null; } applyVaultDoc(); }
   loadLib().catch(() => {});
