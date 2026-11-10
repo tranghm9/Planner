@@ -93,7 +93,7 @@ try {
     saved ? `Tiến trình đã được tự lưu: ${saved}` : '',
     already ? 'Đã cảnh báo người dùng ở mức này; chỉ nhắc lại một dòng nếu việc sắp làm sẽ tốn nhiều token.'
       : 'Ở đầu câu trả lời, cảnh báo ngắn bằng tiếng Việt về độ đầy ngữ cảnh và đề xuất cách tiết kiệm token phù hợp với việc đang làm (xem mục "Tiết kiệm token" trong CLAUDE.md), ví dụ: làm xong và commit việc dở, mở phiên mới cho yêu cầu tiếp theo, tránh đọc lại tệp lớn.',
-    ratio >= CRIT ? 'Trước việc lớn tiếp theo: commit + push, ghi trạng thái vào docs/TIEN-DO.md, và đề nghị người dùng mở phiên mới.' : '',
+    ratio >= CRIT ? 'Trước việc lớn tiếp theo: commit + push, cập nhật TASKS.md và CURRENT.md, và đề nghị người dùng mở phiên mới.' : '',
   ].filter(Boolean).join(' ');
   out({
     systemMessage: `Ngữ cảnh đã dùng ~${pct}%${saved ? ` · ${saved}` : ''}`,

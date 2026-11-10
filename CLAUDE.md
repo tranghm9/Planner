@@ -1,16 +1,57 @@
-# Sổ Kế Hoạch (repo Planner)
+# CLAUDE.md — Quy tắc vận hành (repo Planner)
 
-- Người dùng nói tiếng Việt và không rành kỹ thuật: trả lời bằng tiếng Việt dễ hiểu, tự làm phần kỹ thuật, chỉ nhờ người dùng việc chắc chắn không tự làm được.
-- App: `app/so-ke-hoach.html` (một tệp, ~180 KB). Đăng thành artifact riêng tư https://claude.ai/artifact/Wemqe6QXbDUAJRH7dGWNHP bằng công cụ Artifact với cùng `file_path` (lần đầu đăng kèm `files`: `lib/no/*.js`, `fixtures/no/sample.json`).
-- `app/lib/no/`: lớp tính toán Sổ nợ chép **nguyên văn** từ `tranghm9/FA-report` (không sửa, xem README trong thư mục). Tệp riêng: `sheets-source.js`, `vault-store.js`.
-- Test: `npm test` (74 test). Số chuẩn mục 9 của FA-report nằm trong `tests/no/so-chuan.test.mjs`.
-- Làm trên nhánh làm việc, không commit lên `main`. Tiến độ và việc còn dở: `docs/TIEN-DO.md`.
+Claude đọc tệp này đầu tiên trong mỗi phiên. Dự án đặt trong `01_PROJECTS/<tên-dự-án>/`.
 
-## Tiết kiệm token
+## 1. Khi bắt đầu phiên làm việc
+1. Đọc `CURRENT.md` để biết ưu tiên và dự án đang hoạt động.
+2. Xác định dự án liên quan đến yêu cầu.
+3. Đọc `PROJECT.md`, `DECISIONS.md`, `TASKS.md` của dự án đó.
+4. Chỉ lấy reference cần thiết cho công việc đang làm.
+5. Báo lại ngắn gọn: dự án nào, trạng thái gì, bước tiếp theo, có điểm nghẽn nào không.
 
-1. Không đọc cả `app/so-ke-hoach.html` (~50 nghìn token). Dùng Grep `-n` tìm chỗ cần sửa rồi Read theo `offset`/`limit`; sửa nhỏ bằng Edit hoặc `edits` của Artifact.
-2. Không đọc lại các tệp chép nguyên văn trong `app/lib/no/`. Chạy test và chỉ in dòng tổng: `npm test 2>&1 | grep -E "^# (pass|fail)"`.
-3. Kiểm tra giao diện: tối đa một ảnh chụp cho mỗi thay đổi, khổ 400px, `deviceScaleFactor: 1`. Ưu tiên kiểm tra bằng số liệu/DOM thay cho ảnh.
-4. Không mở lại PDF, ảnh hay tài liệu dài đã đọc; ghi phần cần nhớ vào `docs/TIEN-DO.md`.
-5. Mỗi phiên một nhóm việc. Xong thì commit + push, cập nhật `docs/TIEN-DO.md`, và đề nghị người dùng mở phiên mới cho yêu cầu tiếp theo.
-6. Hook `.claude/hooks/context-guard.mjs` báo độ đầy ngữ cảnh: từ 60% thì cảnh báo người dùng 1–2 câu kèm đề xuất cụ thể; từ 80% thì hook đã tự commit + push, hãy cập nhật `docs/TIEN-DO.md` và đề nghị mở phiên mới trước việc lớn.
+**Không** đọc toàn bộ `02_REFERENCES/` trong mỗi phiên. **Không** đọc `99_ARCHIVE/` trừ khi người dùng yêu cầu rõ ràng.
+
+## 2. Khi làm việc
+- Không sửa tệp trong `02_REFERENCES/` và `03_TEMPLATES/`. Nếu thấy cần sửa, đề xuất và chờ duyệt.
+- Mọi bản nháp lưu vào `WORKING/` của dự án, đặt tên `<tên>_v01.md`, `_v02`, `_v03`…
+- Không ghi đè bản nháp cũ. Luôn tạo bản mới.
+- Không thay đổi quyết định đã ghi trong `DECISIONS.md`. Nếu được yêu cầu đổi: nhắc lại quyết định cũ kèm ngày và lý do, rồi hỏi xác nhận trước khi làm.
+- Không tự di chuyển hoặc xóa tệp trong `04_INBOX/`. Chỉ đề xuất, chờ duyệt.
+- Khi viết nội dung, luôn áp dụng `MEMORY.md` (giọng văn, đối tượng, nguyên tắc).
+- Khi tạo đầu ra có template tương ứng trong `03_TEMPLATES/`, theo đúng template đó.
+
+## 3. Khi kết thúc phiên làm việc
+- Cập nhật `TASKS.md`: chuyển trạng thái các việc đã làm.
+- Ghi quyết định mới (nếu có) vào `DECISIONS.md`, kèm ngày và lý do trong một dòng.
+- Cập nhật `CURRENT.md` nếu trạng thái dự án hoặc bước tiếp theo thay đổi.
+- Báo cho người dùng những tệp nào đã được tạo hoặc sửa.
+
+## 4. Khi chốt bản cuối ("Chốt bản này" hoặc tương đương)
+1. Copy bản nháp đó sang `OUTPUT/` với tên `<tên>_final.md`.
+2. Giữ nguyên toàn bộ tệp trong `WORKING/`, không xóa.
+3. Cập nhật `TASKS.md` và `CURRENT.md`.
+
+## 5. Khi hoàn thành dự án ("Archive dự án này")
+1. Kiểm tra `OUTPUT/` đã có tệp final chưa. Nếu chưa, cảnh báo và dừng lại.
+2. Gỡ dự án khỏi `CURRENT.md`.
+3. Ghi một dòng tổng kết vào cuối `PROJECT.md`.
+4. Di chuyển thư mục dự án sang `99_ARCHIVE/<năm>/`.
+
+## 6. Nguyên tắc chung
+- Thà hỏi lại một câu còn hơn đoán sai bối cảnh.
+- Số liệu không có nguồn thì không đưa vào bản nháp.
+- Không tìm thấy thông tin trong Workspace thì nói rõ là không có, không tự suy diễn.
+
+## 7. Riêng repo này
+- Mã nguồn app Sổ Kế Hoạch nằm ở `app/` (không theo quy tắc bản nháp `_v01`; sửa trực tiếp, lịch sử nằm trong git). `WORKING/` và `OUTPUT/` dùng cho tài liệu (đặc tả, hướng dẫn, báo cáo).
+- App là artifact riêng tư https://claude.ai/artifact/Wemqe6QXbDUAJRH7dGWNHP, đăng bằng công cụ Artifact với `file_path` = `app/so-ke-hoach.html` (kèm `files`: `lib/no/*.js`, `fixtures/no/sample.json` khi các tệp đó đổi).
+- `app/lib/no/` chép nguyên văn từ `tranghm9/FA-report`; không sửa. Test: `npm test` (74 test).
+- Làm trên nhánh làm việc, không commit lên `main`.
+
+## 8. Tiết kiệm token
+1. Không đọc cả `app/so-ke-hoach.html` (~50 nghìn token): Grep `-n` rồi Read theo `offset`/`limit`; sửa nhỏ bằng Edit hoặc `edits` của Artifact.
+2. Không đọc lại tệp trong `app/lib/no/`; chạy test chỉ in dòng tổng: `npm test 2>&1 | grep -E "^# (pass|fail)"`.
+3. Mỗi thay đổi giao diện tối đa một ảnh chụp kiểm tra (400px, `deviceScaleFactor: 1`); ưu tiên kiểm tra bằng số liệu/DOM.
+4. Không mở lại PDF/ảnh/tài liệu dài đã đọc; đọc bản tóm tắt trong `02_REFERENCES/`.
+5. Mỗi phiên một nhóm việc; xong thì commit + push, cập nhật `TASKS.md`/`CURRENT.md`, đề nghị mở phiên mới.
+6. Hook `.claude/hooks/context-guard.mjs`: từ 60% ngữ cảnh thì cảnh báo người dùng 1–2 câu kèm đề xuất; từ 80% hook đã tự commit + push, hãy cập nhật `TASKS.md`/`CURRENT.md` và đề nghị mở phiên mới trước việc lớn.
