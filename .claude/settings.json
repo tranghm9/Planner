@@ -1,0 +1,43 @@
+{
+  "env": {
+    "PLANNER_CONTEXT_WINDOW": "1000000",
+    "PLANNER_CONTEXT_WARN": "0.6",
+    "PLANNER_CONTEXT_CRIT": "0.8"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/context-guard.mjs\" prompt",
+            "timeout": 90
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/context-guard.mjs\" precompact",
+            "timeout": 90,
+            "statusMessage": "Đang tự lưu tiến trình trước khi tóm tắt…"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/context-guard.mjs\" stop",
+            "timeout": 90
+          }
+        ]
+      }
+    ]
+  }
+}
