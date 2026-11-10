@@ -350,6 +350,12 @@ table.tbl th{font-weight:600;color:var(--muted)}
 .swatch.st,.share .tr i.st{background:repeating-linear-gradient(135deg,var(--c) 0 3px,color-mix(in srgb,var(--c) 35%,transparent) 3px 6px)}
 .dlegend{display:flex;flex-direction:column;gap:5px;font-size:13.5px;margin-top:10px}
 .dlegend>div{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.lockcard{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding-block:28px}
+.lockic{width:56px;height:56px;border-radius:16px 18px 15px 19px;background:var(--rose-soft);border:2px solid var(--pen);display:grid;place-items:center;color:var(--rose)}
+.lockic svg{width:28px;height:28px}
+.pinrow{display:flex;gap:8px;width:100%;max-width:320px}
+.pinrow input{flex:1;min-width:0;border:2px solid var(--line);border-radius:12px;padding:9px 12px;background:var(--sunken);font-size:20px;letter-spacing:.3em;text-align:center}
+.pinrow input:focus{outline:none;border-color:var(--rose)}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:14px;font-size:14px;max-width:min(92vw,520px);display:flex;gap:12px;align-items:center}
 #toast button{border:0;background:none;color:var(--rose-mid);font-weight:700;padding:0}
 @media (min-width:960px){#toast{bottom:24px}}
@@ -962,29 +968,60 @@ function radarSvg(sp, W) {
   pts.forEach((p, i) => { const tip = esc(sp.labels[i] + ': ' + vals[i] + '% tiến độ trung bình'); g += `<circle cx="${p[0]}" cy="${p[1]}" r="5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/><circle cx="${p[0]}" cy="${p[1]}" r="14" fill="transparent" data-tip="${tip}"/>`; });
   return `<svg width="${W}" height="${size}" viewBox="0 0 ${W} ${size}" role="img" aria-label="Cân bằng các lĩnh vực">${g}</svg>`;
 }
+/** Chuyển màu var(--…) từ thuộc tính SVG (fill/stroke) sang style: Safari/iPhone không hiểu var() trong thuộc tính. */
+function cssPaint(html) {
+  return html.replace(/<([a-zA-Z]+)((?:\s+[^\s=>\/]+="[^"]*")*)\s*(\/?)>/g, (m, tag, attrs, sl) => {
+    const st = [];
+    const rest = attrs.replace(/\s+(fill|stroke|stop-color)="(var\([^"]*\))"/g, (_, k, v) => { st.push(`${k}:${v}`); return ''; });
+    if (!st.length) return m;
+    const withStyle = /\sstyle="/.test(rest) ? rest.replace(/\sstyle="([^"]*)"/, (_, x) => ` style="${x};${st.join(';')}"`) : `${rest} style="${st.join(';')}"`;
+    return `<${tag}${withStyle}${sl ? ' /' : ''}>`;
+  });
+}
 function drawCharts() {
   document.querySelectorAll('[data-chart]').forEach(el => {
     const k = el.dataset.chart, sp = CH[k]; if (!sp) return; const W = Math.max(240, el.clientWidth); const mode = S.chartMode[k] || 'line';
-    el.innerHTML = mode === 'table' ? (sp.table ? sp.table() : tableHtml(sp)) : sp.type === 'radar' ? radarSvg(sp, W) : sp.type === 'stack' ? stackSvg(sp, W) : sp.type === 'hist' ? histSvg(sp, W) : svgChart(sp, W, mode);
+    el.innerHTML = mode === 'table' ? (sp.table ? sp.table() : tableHtml(sp)) : cssPaint(sp.type === 'radar' ? radarSvg(sp, W) : sp.type === 'stack' ? stackSvg(sp, W) : sp.type === 'hist' ? histSvg(sp, W) : svgChart(sp, W, mode));
   });
 }
 function ring(p, size = 72, stroke = 8, label) {
   const r = (size - stroke) / 2, c = 2 * Math.PI * r, off = c * (1 - clamp(p, 0, 100) / 100);
-  return `<div class="ring" style="width:${size}px;height:${size}px"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+  return cssPaint(`<div class="ring" style="width:${size}px;height:${size}px"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
     <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--line)" stroke-width="${stroke}"/>
     <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${p >= 100 ? 'var(--ok)' : 'var(--rose)'}" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 ${size/2} ${size/2})"/></svg>
-    <b class="num" style="font-size:${Math.round(size / 4.2)}px">${label ?? p + '%'}</b></div>`;
+    <b class="num" style="font-size:${Math.round(size / 4.2)}px">${label ?? p + '%'}</b></div>`);
 }
 
 /* ================= Sổ nợ: lớp tính toán lấy nguyên từ FA-report (app/lib/no), giao diện viết lại ================= */
 const DEBT_PEOPLE = ['Trang', 'Dũng'];
 const D = { lib: null, libErr: null, libP: null, d: null, warnings: [], source: null, at: null, loading: false, error: null, note: '',
-  sub: 'overview', person: 'Tất cả', scope: 'month', sheetId: null, cfgLoaded: false, tried: false, autoTried: false, retried: false };
+  sub: 'overview', person: 'Tất cả', scope: 'month', cfgLoaded: false, tried: false, autoTried: false, retried: false,
+  fails: 0, lockedUntil: 0, wipeArmed: false, pinMsg: '', conn: null };
+// Khóa PIN: secure.js (nguyên văn FA-report) trên chỗ lưu vault-store.js, ghi xuống meta/debt (riêng tư) hoặc bộ nhớ máy.
+const VS = { kv: null, sec: null, doc: undefined };
+const AUTO_LOCK_MS = 60000;
+function flushVault(kv) {
+  if (S.mode === 'db' && db) { const body = { kv, updatedAt: Date.now() }; queueWrite('debtcfg', () => db.doc('meta/debt').set(body)); }
+  else { try { localStorage.setItem('skh-debt-kv', JSON.stringify(kv)); localStorage.removeItem('skh-debt'); } catch {} }
+}
+function applyVaultDoc() {
+  if (!D.lib || VS.doc === undefined) return;
+  if (!VS.sec) { VS.kv = D.lib.createKvStore(flushVault); VS.sec = D.lib.createSecure(VS.kv); }
+  const before = sid();
+  VS.kv.load(D.lib.migrateLegacy(VS.doc));
+  if (VS.doc && !VS.doc.kv && VS.doc.sheetId) flushVault(VS.kv.snapshot()); // chuyển bản lưu cũ { sheetId }
+  if (sid() !== before) { D.d = null; D.source = null; D.tried = false; }
+  D.cfgLoaded = true; maybeAutoDebt();
+  if (S.view === 'debt' && !S.loading) render();
+}
+const sid = () => { const c = VS.sec && !VS.sec.locked ? VS.sec.getCfg() : null; return c && c.dataUrl && D.lib ? D.lib.sheetIdFrom(c.dataUrl) : null; };
+const pinOn = () => !!(VS.sec && VS.sec.enabled);
+const pinLocked = () => !!(VS.sec && VS.sec.locked);
 function loadLib() {
   if (D.libP) return D.libP;
-  const files = ['parse', 'format', 'validate', 'data', 'overview', 'report', 'history', 'export', 'sheets-source'];
+  const files = ['parse', 'format', 'validate', 'data', 'overview', 'report', 'history', 'export', 'sheets-source', 'secure', 'vault-store'];
   D.libP = Promise.all(files.map((f) => import(`./lib/no/${f}.js`)))
-    .then((ms) => { D.lib = Object.assign({}, ...ms); return D.lib; })
+    .then((ms) => { D.lib = Object.assign({}, ...ms); applyVaultDoc(); return D.lib; })
     .catch((e) => { D.libErr = 'Không tải được phần tính toán Sổ nợ. Hãy tải lại trang.'; throw e; });
   return D.libP;
 }
@@ -1000,17 +1037,18 @@ const MCP_ERR = {
 };
 const AUTHZ = ['needs_reauth', 'server_not_connected', 'not_in_manifest', 'approval_required', 'blocked_by_policy', 'sheet_unreadable', 'selection_required'];
 async function loadDebt({ refresh = false, sample = false } = {}) {
-  if (D.loading) return;
+  if (D.loading || pinLocked()) return;
   D.loading = true; D.error = null; D.tried = true; if (S.view === 'debt') render();
   try {
     const L = await loadLib();
     let raw, source, note = '';
-    if (!sample && D.sheetId && AI.mcp) { raw = await L.readSheet(AI.mcp, D.sheetId, { refresh }); source = 'sheet'; }
+    const id = sid();
+    if (!sample && id && AI.mcp) { raw = await L.readSheet(AI.mcp, id, { refresh }); source = 'sheet'; }
     else {
       const res = await fetch('fixtures/no/sample.json', { cache: 'no-store' });
       if (!res.ok) throw { code: 'sample' };
       raw = await res.json(); source = 'sample';
-      if (D.sheetId && !AI.mcp && !sample) note = 'Kết nối Google Sheets không dùng được ở chỗ này (ví dụ khi mở ngoài Claude), nên đang hiện dữ liệu mẫu.';
+      if (id && !AI.mcp && !sample) note = 'Kết nối Google Sheets không dùng được ở chỗ này (ví dụ khi mở ngoài Claude), nên đang hiện dữ liệu mẫu.';
     }
     const d = L.normalize(raw);
     Object.assign(D, { d, warnings: L.validate(d), source, note, at: raw.generatedAt || new Date().toISOString(), retried: false });
@@ -1022,13 +1060,35 @@ async function loadDebt({ refresh = false, sample = false } = {}) {
     if (e && e.retryable && !D.retried) { D.retried = true; setTimeout(() => { D.loading = false; loadDebt({ refresh }); }, Math.min(60000, e.retryAfterMs || 1500 + Math.random() * 1500)); }
   } finally { D.loading = false; render(); }
 }
-function saveDebtCfg(id) {
-  D.sheetId = id || null; D.d = null; D.source = null; D.tried = false; D.error = null;
-  if (S.mode === 'db') { const body = { sheetId: D.sheetId, updatedAt: Date.now() }; queueWrite('debtcfg', () => db.doc('meta/debt').set(body)); }
-  else { try { localStorage.setItem('skh-debt', JSON.stringify({ sheetId: D.sheetId })); } catch {} }
+async function saveDebtCfg(id) {
+  if (!VS.sec || pinLocked()) { toast('Mở khóa Sổ nợ trước khi đổi nguồn.'); return false; }
+  const ok = id ? await VS.sec.setCfg({ dataUrl: D.lib.sheetLink(id), dataKey: '' }) : (await VS.sec.clearCfg(), true);
+  D.d = null; D.source = null; D.tried = false; D.error = null;
+  return ok !== false;
+}
+function lockDebt() {
+  if (!VS.sec || !pinOn()) return;
+  VS.sec.lock(); Object.assign(D, { d: null, warnings: [], source: null, at: null, error: null, tried: false, pinMsg: '', wipeArmed: false });
+  render();
+}
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (pinOn() && !pinLocked() && hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS) lockDebt();
+});
+async function unlockDebt(pin) {
+  const wait = Math.ceil((D.lockedUntil - Date.now()) / 1000);
+  if (wait > 0) { D.pinMsg = `Thử lại sau ${wait} giây.`; render(); return; }
+  if (!D.lib.PIN_RE.test(pin)) { D.pinMsg = 'Mã PIN gồm 6 đến 12 chữ số.'; render(); return; }
+  D.pinMsg = 'Đang kiểm tra…'; render();
+  if (await VS.sec.unlock(pin)) { D.fails = 0; D.lockedUntil = 0; D.pinMsg = ''; D.wipeArmed = false; D.tried = false; render(); return; }
+  D.fails++;
+  if (D.fails >= 3) { const sec = Math.min(300, 5 * 2 ** (D.fails - 3)); D.lockedUntil = Date.now() + sec * 1000; D.pinMsg = `Sai mã PIN. Chờ ${sec} giây rồi thử lại.`; }
+  else D.pinMsg = 'Sai mã PIN.';
+  render();
 }
 function maybeAutoDebt() {
-  if (D.autoTried || !D.cfgLoaded || !D.sheetId || !AI.mcp || !AI.perms) return; D.autoTried = true;
+  if (D.autoTried || !D.cfgLoaded || pinLocked() || !sid() || !AI.mcp || !AI.perms) return; D.autoTried = true;
   AI.perms.state('mcp:Google Sheets').then((s) => { if (s === 'granted') loadDebt(); }).catch(() => {});
 }
 
@@ -1054,7 +1114,7 @@ function debtHeader() {
   const at = D.at ? new Date(D.at) : null;
   const src = D.source === 'sheet' ? `Đọc từ Google Sheet “Sổ nợ” lúc ${at ? `${pad(at.getHours())}:${pad(at.getMinutes())} ${dm(at)}` : '—'}. Sổ chỉ đọc, không ghi vào Sheet.`
     : D.source === 'sample' ? '' : '';
-  return `<section class="card sk"><div class="card-h"><h2>Sổ nợ Trang & Dũng</h2><button class="btn sm" data-act="debt-refresh"${D.loading ? ' disabled' : ''}>${D.loading ? 'Đang đọc…' : 'Làm mới'}</button></div>
+  return `<section class="card sk"><div class="card-h"><h2>Sổ nợ Trang & Dũng</h2><div class="row">${pinOn() ? '<button class="btn ghost sm" data-act="debt-lock">Khóa</button>' : ''}<button class="btn sm" data-act="debt-refresh"${D.loading ? ' disabled' : ''}>${D.loading ? 'Đang đọc…' : 'Làm mới'}</button></div></div>
     <div class="row" style="justify-content:space-between">${seg('debt-sub', D.sub, [['overview', 'Tổng quan'], ['report', 'Báo cáo']])}${seg('debt-person', D.person, [['Tất cả', 'Tất cả'], ['Trang', 'Trang'], ['Dũng', 'Dũng']])}</div>
     ${src ? `<p class="hint" style="margin-top:10px">${esc(src)}</p>` : ''}
     ${D.source === 'sample' ? `<div class="banner" style="margin-top:10px;border-color:var(--est)"><span><b>Đang xem dữ liệu mẫu (ẩn danh), không phải số thật.</b> ${esc(D.note || 'Thêm link Google Sheet “Sổ nợ” trong Cài đặt để xem số của bạn.')}</span><button class="btn sm" data-go="settings">Cài đặt</button></div>` : ''}
@@ -1064,7 +1124,7 @@ function errorCard() {
   const e = D.error || { msg: D.libErr };
   return `<section class="card sk"><p style="margin:0 0 10px">${esc(e.msg)}</p><div class="row">
     ${e.ask ? '<button class="btn primary sm" data-act="debt-refresh">Cho phép và đọc Sheet</button>' : '<button class="btn sm" data-act="debt-refresh">Thử lại</button>'}
-    <button class="btn ghost sm" data-act="debt-sample">Xem dữ liệu mẫu</button><button class="btn ghost sm" data-go="settings">Cài đặt nguồn</button></div></section>`;
+    <button class="btn ghost sm" data-act="conn-guide">Cách kết nối Google Sheets</button><button class="btn ghost sm" data-act="debt-sample">Xem dữ liệu mẫu</button></div></section>`;
 }
 function personOverview(d, person, today, due) {
   const L = D.lib, s = L.debtSummary(d, person);
@@ -1112,8 +1172,7 @@ function debtReport() {
   const mode = (k) => S.chartMode[k] || 'chart';
   const modeSeg = (k) => `<div class="seg" role="group" aria-label="Kiểu hiển thị">${[['chart', 'Biểu đồ'], ['table', 'Bảng']].map(([v, l]) => `<button data-act="cmode" data-k="${k}" data-m="${v}" aria-pressed="${mode(k) === v}">${l}</button>`).join('')}</div>`;
   const maxShare = Math.max(1, ...sh.rows.map((x) => x.total));
-  const cardNames = new Set(d.the.map((t) => t.ten ?? t.ma ?? '?'));
-  const shareRows = sh.rows.map((x) => { const c = x.other ? '--chx' : cardNames.has(x.name) ? '--ch4' : '--ch0';
+  const shareRows = sh.rows.map((x, i) => { const c = x.other ? '--chx' : `--ch${i % 6}`;
     return `<div class="share"><span style="min-width:0;overflow-wrap:anywhere"><i class="swatch" style="--c:var(${c})"></i>${esc(x.name)}</span>
       <span class="tr" data-tip="${esc(`${x.name}: ${L.money(x.total)} · ${Math.round(x.pct * 100)}% · ${L.TAG[x.kind]}`)}"><i style="width:${(x.ok / maxShare * 100).toFixed(1)}%;background:var(${c})"></i><i class="st" style="--c:var(${c});width:${(x.est / maxShare * 100).toFixed(1)}%"></i></span>
       <span style="text-align:right"><span class="num">${esc(L.money(x.total))}</span> <small class="muted num">${Math.round(x.pct * 100)}%</small>${debtTag(x.kind)}</span></div>`; }).join('');
@@ -1132,7 +1191,6 @@ function debtReport() {
       ${r.earlier.count ? `<p class="hint" style="color:var(--danger)">Còn ${r.earlier.count} kỳ quá hạn từ trước tháng này (${esc(L.money(r.earlier.amount))}), chưa tính vào biểu đồ.</p>` : ''}
       ${issues.length ? `<ul class="hint" style="margin:8px 0 0;padding-left:18px;color:var(--est)">${issues.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</section>
     <section class="card sk"><div class="card-h"><h2>Cơ cấu theo đơn vị</h2><div class="seg" role="group">${[['month', 'Tháng này'], ['all', 'Cả 7 tháng']].map(([v, l]) => `<button data-act="debt-scope" data-v="${v}" aria-pressed="${D.scope === v}">${l}</button>`).join('')}</div></div>
-      <p class="hint" style="margin:-4px 0 6px"><i class="swatch" style="--c:var(--ch0)"></i>Khoản vay <i class="swatch" style="--c:var(--ch4);margin-left:10px"></i>Thẻ <i class="swatch st" style="--c:var(--ch4);margin-left:10px"></i>phần ước tính</p>
       ${sh.rows.length ? `${shareRows}<div class="fr" style="margin-top:6px"><b>Tổng</b><span>${vnd(sh.total)}</span></div>` : '<p class="hint">Chưa có khoản nào trong khoảng này.</p>'}</section>
     <section class="card sk"><div class="card-h"><h2>Lịch sử dư nợ</h2>${pts.length ? modeSeg('dhist') : ''}</div>
       ${pts.length ? `<div class="plot" data-chart="dhist"></div>
@@ -1143,10 +1201,21 @@ function debtReport() {
         : `<p class="hint">Chưa có: Nhật ký chưa ghi khoản trả nào của ${esc(p === 'Tất cả' ? 'Trang và Dũng' : p)}.</p>`}</section>
     ${AI.downloads ? `<div class="row"><button class="btn sm" data-act="debt-csv" data-k="forecast">Tải CSV dự kiến</button>${pts.length ? '<button class="btn sm" data-act="debt-csv" data-k="history">Tải CSV lịch sử</button>' : ''}</div>` : ''}`;
 }
+function lockView() {
+  const wait = Math.ceil((D.lockedUntil - Date.now()) / 1000);
+  return `<section class="card sk lockcard"><span class="lockic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></span>
+    <h2>Sổ nợ đang khóa</h2><p class="hint">Nhập mã PIN để xem. Khi khóa, số liệu nợ không nằm trong bộ nhớ của trang.</p>
+    <form id="pin-unlock" class="pinrow"><input id="pin-in" type="password" inputmode="numeric" autocomplete="off" maxlength="12" aria-label="Mã PIN" placeholder="Mã PIN"><button class="btn primary"${wait > 0 ? ' disabled' : ''}>Mở khóa</button></form>
+    <p class="hint" role="status" style="min-height:1.4em;color:var(--danger)">${esc(D.pinMsg)}</p>
+    <button class="btn ghost sm" data-act="pin-forgot">${D.wipeArmed ? 'Bấm lần nữa để XÓA mã PIN và link Sheet đã lưu' : 'Quên mã PIN'}</button>
+    <p class="hint" style="margin-top:6px">Quên PIN thì phải xóa mã PIN cùng link Sheet đã lưu, rồi dán lại link. Dữ liệu trong Google Sheet và các phần khác của sổ không bị ảnh hưởng.</p></section>`;
+}
 function viewDebt() {
+  if (!D.lib && !D.libErr) { loadLib().then(render, render); return '<div class="empty"><span class="busy" style="justify-content:center"><span class="spin"></span>Đang mở Sổ nợ…</span></div>'; }
+  if (D.libErr) return errorCard();
+  if (pinLocked()) return lockView();
   if (!D.d && !D.loading && !D.tried && D.cfgLoaded) setTimeout(() => loadDebt(), 0);
   const head = debtHeader();
-  if (D.libErr) return head + errorCard();
   if (!D.d) return head + (D.error ? errorCard() : '<div class="empty"><span class="busy" style="justify-content:center"><span class="spin"></span>Đang đọc Sổ nợ…</span></div>');
   return head + warnBox(D.warnings) + (D.sub === 'report' ? debtReport() : debtOverview());
 }
@@ -1202,12 +1271,61 @@ async function debtCsv(kind) {
   catch (e) { if (e && e.code !== 'declined') toast('Chưa tải được file, thử lại nhé.'); }
 }
 function debtSettingsHtml() {
-  const id = D.sheetId;
+  if (!D.lib) { if (!D.libErr) loadLib().then(() => { if (S.view === 'settings') render(); }, () => {}); return `<section class="card sk"><div class="card-h"><h2>Sổ nợ</h2></div><p class="hint">${esc(D.libErr || 'Đang tải…')}</p></section>`; }
+  if (pinLocked()) return `<section class="card sk"><div class="card-h"><h2>Sổ nợ</h2></div><p class="hint">Sổ nợ đang khóa bằng mã PIN. Mở khóa để xem hoặc đổi nguồn dữ liệu và mã PIN.</p><div class="row" style="margin-top:8px"><button class="btn sm" data-go="debt">Mở khóa Sổ nợ</button><button class="btn ghost sm" data-act="conn-guide">Cách kết nối Google Sheets</button></div></section>`;
+  const id = sid();
   return `<section class="card sk"><div class="card-h"><h2>Sổ nợ</h2></div>
     <div class="set"><div class="lbl"><b>Nguồn dữ liệu</b><span>${id ? `Google Sheet “Sổ nợ” (mã …${esc(id.slice(-6))}). Sổ chỉ đọc, không bao giờ ghi vào Sheet.` : 'Đang dùng dữ liệu mẫu (ẩn danh). Dán link Google Sheet “Sổ nợ” để xem số thật.'}</span></div></div>
     <form class="add" id="debt-cfg" style="margin-top:0"><input id="debt-sheet" placeholder="Dán link hoặc mã Google Sheet “Sổ nợ”" aria-label="Link hoặc mã Google Sheet Sổ nợ" autocomplete="off"><button aria-label="Lưu nguồn" style="width:auto;padding:0 12px;font-size:14px">Lưu</button></form>
-    <div class="row" style="margin-top:10px">${id ? '<button class="btn sm" data-act="debt-refresh">Đọc lại ngay</button><button class="btn ghost sm" data-act="debt-clear">Dùng dữ liệu mẫu</button>' : ''}</div>
-    <p class="hint" style="margin-top:8px">Cần kết nối Google Sheets trong tài khoản Claude. Lần đầu đọc, Claude sẽ hỏi bạn có cho phép không.</p></section>`;
+    <div class="row" style="margin-top:10px">${id ? '<button class="btn sm" data-act="debt-refresh">Đọc lại ngay</button><button class="btn ghost sm" data-act="debt-clear">Dùng dữ liệu mẫu</button>' : ''}<button class="btn ghost sm" data-act="conn-guide">Cách kết nối Google Sheets</button></div>
+    <div class="set" style="margin-top:10px;border-top:1.5px dashed var(--line)"><div class="lbl"><b>Khóa Sổ nợ bằng mã PIN</b><span>${pinOn() ? 'Đang bật. Link Sheet được mã hóa (AES-GCM, khóa sinh từ PIN). Tự khóa khi rời app quá 1 phút; sai 3 lần phải chờ.' : 'Chưa bật. PIN gồm 6 đến 12 chữ số, dùng được trên mọi thiết bị của bạn. Chỉ khóa phần Sổ nợ; việc, thói quen, mục tiêu không bị khóa.'}</span></div>
+      <div class="row">${pinOn() ? '<button class="btn sm" data-act="debt-lock">Khóa ngay</button><button class="btn sm" data-act="pin-open" data-v="change">Đổi PIN</button><button class="btn ghost sm danger" data-act="pin-open" data-v="disable">Tắt khóa</button>' : '<button class="btn primary sm" data-act="pin-open" data-v="enable">Bật khóa PIN</button>'}</div></div></section>`;
+}
+function pinSheet(mode) {
+  const f = (id, label) => `<div class="f"><label for="${id}">${label}</label><input id="${id}" type="password" inputmode="numeric" autocomplete="off" maxlength="12"></div>`;
+  const title = { enable: 'Bật khóa PIN cho Sổ nợ', change: 'Đổi mã PIN', disable: 'Tắt khóa PIN' }[mode];
+  const body = mode === 'enable' ? f('pin-a', 'Mã PIN mới (6–12 chữ số)') + f('pin-b', 'Nhập lại mã PIN')
+    : mode === 'change' ? f('pin-cur', 'Mã PIN hiện tại') + f('pin-a', 'Mã PIN mới (6–12 chữ số)') + f('pin-b', 'Nhập lại mã PIN mới') : f('pin-cur', 'Mã PIN hiện tại');
+  openSheet(`<form id="pin-form" class="f" style="gap:12px" data-mode="${mode}"><h3>${title}</h3>${body}
+    ${mode === 'enable' ? '<p class="hint">Hãy nhớ mã PIN. Quên PIN thì phải xóa mã PIN và dán lại link Sheet. PIN chống người khác cầm máy xem lén; nó không thay được mật khẩu tài khoản Claude.</p>' : ''}
+    <p class="hint" id="pin-form-msg" role="status" style="color:var(--danger);min-height:1.2em"></p>
+    <div class="row" style="justify-content:flex-end"><button type="button" class="btn ghost" data-act="close">Hủy</button><button type="submit" class="btn primary">${mode === 'disable' ? 'Tắt khóa' : 'Lưu'}</button></div></form>`);
+}
+async function submitPin(form) {
+  const L = D.lib, mode = form.dataset.mode, msg = $('#pin-form-msg'), val = (id) => ($(id) ? $(id).value.trim() : '');
+  const a = val('#pin-a'), b = val('#pin-b'), cur = val('#pin-cur');
+  if (mode !== 'disable') { if (!L.PIN_RE.test(a)) { msg.textContent = 'Mã PIN gồm 6 đến 12 chữ số.'; return; } if (a !== b) { msg.textContent = 'Hai lần nhập mã PIN chưa giống nhau.'; return; } }
+  msg.textContent = 'Đang xử lý…';
+  try {
+    if (mode === 'enable') await VS.sec.enable(a);
+    else { if (!(await VS.sec.disable(cur))) { msg.textContent = 'Sai mã PIN hiện tại.'; return; } if (mode === 'change') await VS.sec.enable(a); }
+  } catch (e) { msg.textContent = e && e.message ? e.message : 'Chưa lưu được, thử lại nhé.'; return; }
+  closeSheet(); render(); toast(mode === 'enable' ? 'Đã bật khóa PIN cho Sổ nợ.' : mode === 'change' ? 'Đã đổi mã PIN.' : 'Đã tắt khóa PIN.');
+}
+async function checkConn() {
+  D.conn = 'Đang kiểm tra…'; connPaint();
+  if (!AI.mcp) { D.conn = 'Kết nối không dùng được ở chỗ này. Hãy mở Sổ Kế Hoạch trong Claude (trình duyệt hoặc ứng dụng) khi đã đăng nhập.'; connPaint(); return; }
+  let auth = null, perm = 'unavailable';
+  try { const r = await AI.mcp.listTools('Google Sheets'); const sv = (r.servers || []).find((x) => x.server === 'Google Sheets'); auth = sv ? sv.authStatus : null; } catch (e) { auth = e && e.code === 'needs_reauth' ? 'needs_reauth' : null; }
+  try { perm = AI.perms ? await AI.perms.state('mcp:Google Sheets') : 'unavailable'; } catch {}
+  const A = { connected: 'Tài khoản Claude đã kết nối Google Sheets.', needs_reauth: 'Kết nối Google Sheets cần đăng nhập lại (bước 1–2).', unknown: 'Chưa rõ trạng thái kết nối; bấm Làm mới ở Sổ nợ để thử.' };
+  const P = { granted: 'Sổ đã được phép đọc Google Sheets.', prompt: 'Sổ chưa được hỏi quyền; lần đọc đầu Claude sẽ hỏi (bước 3).', denied: 'Bạn đã từ chối quyền đọc Google Sheets cho sổ này (bước 4 để bật lại).', unavailable: '' };
+  D.conn = [auth ? A[auth] || A.unknown : 'Chưa thấy kết nối Google Sheets trong tài khoản Claude (bước 1–2).', P[perm] || ''].filter(Boolean).join(' ');
+  connPaint();
+}
+function connPaint() { const el = $('#conn-status'); if (el) el.textContent = D.conn || ''; }
+function connGuide() {
+  openSheet(`<h3>Cách kết nối Google Sheets</h3>
+    <ol class="guide">
+      <li><b>Mở trang Kết nối của Claude:</b> <a href="https://claude.ai/customize/connectors" target="_blank" rel="noopener">claude.ai/customize/connectors</a>. Trên ứng dụng điện thoại: mở menu tài khoản › <b>Cài đặt</b> › <b>Kết nối</b> (Connectors).</li>
+      <li><b>Tìm “Google Sheets”</b> (có thể nằm trong nhóm Google Drive) › bấm <b>Kết nối</b> › đăng nhập đúng tài khoản Google đang có Sheet “Sổ nợ Trang &amp; Dũng” › bấm <b>Cho phép</b>.</li>
+      <li><b>Quay lại Sổ Kế Hoạch › Sổ nợ</b> và bấm <b>Làm mới</b>. Lần đầu, Claude hỏi có cho trang này dùng Google Sheets không: chọn <b>Cho phép</b>.</li>
+      <li><b>Lỡ chọn “Không”?</b> Bấm “Mở mục Quyền” bên dưới (hoặc menu của trang › Quyền) và bật lại Google Sheets.</li>
+      <li><b>Sheet ở tài khoản khác?</b> Chia sẻ quyền xem Sheet cho tài khoản Google đã kết nối, hoặc kết nối bằng tài khoản đó.</li>
+    </ol>
+    <p class="hint">Sổ chỉ đọc 5 tab: Thông số, Khoản vay, Thẻ, Linh hoạt, Nhật ký. Không bao giờ ghi vào Sheet.</p>
+    <div class="banner"><span id="conn-status" role="status">${esc(D.conn || 'Bấm “Kiểm tra” để xem trạng thái hiện tại.')}</span><span class="row"><button class="btn sm" data-act="conn-check">Kiểm tra</button>${AI.perms ? '<button class="btn ghost sm" data-act="perm-manage">Mở mục Quyền</button>' : ''}</span></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="close">Đóng</button></div>`);
 }
 
 /* ================= rendering: shared ================= */
@@ -1725,7 +1843,13 @@ document.addEventListener('click', e => {
     case 'debt-scope': D.scope = el.dataset.v; render(); break;
     case 'debt-refresh': loadDebt({ refresh: true }); break;
     case 'debt-sample': loadDebt({ sample: true }); break;
-    case 'debt-clear': saveDebtCfg(null); render(); toast('Sổ nợ đang dùng dữ liệu mẫu.'); break;
+    case 'debt-clear': saveDebtCfg(null).then((ok) => { render(); if (ok) toast('Sổ nợ đang dùng dữ liệu mẫu.'); }); break;
+    case 'debt-lock': lockDebt(); toast('Đã khóa Sổ nợ.'); break;
+    case 'pin-forgot': if (!D.wipeArmed) { D.wipeArmed = true; render(); } else { VS.sec.wipe(); Object.assign(D, { wipeArmed: false, fails: 0, lockedUntil: 0, pinMsg: '', d: null, source: null, tried: false }); render(); toast('Đã xóa mã PIN và link Sheet. Dán lại link trong Cài đặt.'); } break;
+    case 'pin-open': pinSheet(el.dataset.v); break;
+    case 'conn-guide': connGuide(); break;
+    case 'conn-check': checkConn(); break;
+    case 'perm-manage': AI.perms.manage().then(() => { D.autoTried = false; checkConn(); }).catch(() => toast('Không mở được. Hãy mở menu của trang › Quyền.')); break;
     case 'debt-csv': debtCsv(el.dataset.k); break;
     case 'theme': S.settings.theme = el.dataset.v; applyTheme(); persistSettings(); render(); break;
     case 'toggle-sound': S.settings.sound = !S.settings.sound; persistSettings(); render(); break;
@@ -1746,7 +1870,9 @@ document.addEventListener('submit', e => {
   if (f.id === 'edit-form') return saveEdit(f);
   if (f.id === 'cat-form') return saveCategory(f);
   if (f.id === 'goal-form') return saveGoal();
-  if (f.id === 'debt-cfg') { const v = $('#debt-sheet').value; loadLib().then((L) => { const id = L.sheetIdFrom(v); if (!id) { toast('Link hoặc mã Google Sheet chưa đúng. Hãy dán link dạng docs.google.com/spreadsheets/d/…'); return; } saveDebtCfg(id); toast('Đã lưu nguồn Sổ nợ.'); go('debt'); }).catch(() => toast(D.libErr || 'Chưa tải được phần Sổ nợ.')); return; }
+  if (f.id === 'debt-cfg') { const v = $('#debt-sheet').value; loadLib().then(async (L) => { const id = L.sheetIdFrom(v); if (!id) { toast('Link hoặc mã Google Sheet chưa đúng. Hãy dán link dạng docs.google.com/spreadsheets/d/…'); return; } if (await saveDebtCfg(id)) { toast('Đã lưu nguồn Sổ nợ.'); go('debt'); } }).catch(() => toast(D.libErr || 'Chưa tải được phần Sổ nợ.')); return; }
+  if (f.id === 'pin-unlock') { unlockDebt($('#pin-in').value.trim()); return; }
+  if (f.id === 'pin-form') { submitPin(f); return; }
   const kind = f.dataset.add; if (!kind) return; const v = f.querySelector('input').value.trim(); if (!v) return;
   const sel = `form.add[data-add="${kind}"]${f.dataset.date ? `[data-date="${f.dataset.date}"]` : ''}${f.dataset.m ? `[data-m="${f.dataset.m}"]` : ''} input`;
   if (kind === 'task') quickAdd(v, f.dataset.date || null);
@@ -1792,14 +1918,15 @@ async function boot() {
   if (dbNs) {
     db = dbNs; S.mode = 'db'; const seen = new Set();
     const timer = setTimeout(() => { if (S.loading) { S.loading = false; updateCaptureUI(); render(); toast('Mạng chậm nên dữ liệu cũ chưa hiện hết. Bạn vẫn ghi việc mới được.'); } }, 10000);
-    db.doc('meta/debt').onSnapshot((snap) => { const o = snap.exists ? snap.data() : null; const id = o && typeof o.sheetId === 'string' ? o.sheetId : null; if (id !== D.sheetId) { D.sheetId = id; D.d = null; D.source = null; D.tried = false; } D.cfgLoaded = true; maybeAutoDebt(); if (S.view === 'debt' && !S.loading) render(); }, () => { D.cfgLoaded = true; });
+    db.doc('meta/debt').onSnapshot((snap) => { if (snap.metadata && snap.metadata.hasPendingWrites) return; const w = writers.get('debtcfg'); if (w && (w.running || w.next)) return; VS.doc = snap.exists ? snap.data() : null; applyVaultDoc(); }, () => { if (VS.doc === undefined) { VS.doc = null; applyVaultDoc(); } });
     db.doc('meta/settings').onSnapshot(snap => { if (snap.exists) { S.settings = mergeSettings(snap.data()); applyTheme(); } if (!S.loading) render(); }, () => {});
     COLLS.forEach(c => db.collection(c).onSnapshot(snap => {
       const m = new Map(); snap.docs.forEach(d => { const o = d.data(); if (o && o.id) m.set(o.id, Object.assign({}, o)); }); S[c] = m; seen.add(c);
       if (S.loading && seen.size === COLLS.length) { clearTimeout(timer); S.loading = false; updateCaptureUI(); }
       if (!S.loading) render();
     }, () => { if (S.loading && c === 'tasks') { clearTimeout(timer); S.mode = 'local'; db = null; loadLocal(); S.loading = false; updateCaptureUI(); render(); toast('Không mở được dữ liệu trên tài khoản, đang dùng bộ nhớ của máy này.'); } }));
-  } else { S.mode = 'local'; loadLocal(); applyTheme(); S.loading = false; try { const o = JSON.parse(localStorage.getItem('skh-debt') || 'null'); D.sheetId = o && o.sheetId || null; } catch {} D.cfgLoaded = true; maybeAutoDebt(); }
+  } else { S.mode = 'local'; loadLocal(); applyTheme(); S.loading = false; try { const kv = JSON.parse(localStorage.getItem('skh-debt-kv') || 'null'); const old = JSON.parse(localStorage.getItem('skh-debt') || 'null'); VS.doc = kv ? { kv } : old; } catch { VS.doc = null; } applyVaultDoc(); }
+  loadLib().catch(() => {});
   updateCaptureUI(); render();
 }
 boot();
