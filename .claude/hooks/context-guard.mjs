@@ -29,7 +29,7 @@ export function lastContext(path) {
     for (let i = lines.length - 1; i >= 0; i--) {
       const l = lines[i]; if (!l.includes('"usage"')) continue;
       let o; try { o = JSON.parse(l); } catch { continue; }
-      const u = o && o.type === 'assistant' && o.message && o.message.usage;
+      const u = o && o.type === 'assistant' && !o.isSidechain && o.message && o.message.usage; // bỏ lượt của agent phụ
       if (u) return { tokens: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0), model: o.message.model || '' };
     }
   } finally { closeSync(fd); }
@@ -86,7 +86,7 @@ try {
   let saved = '';
   if (ratio >= CRIT) saved = autosave('ngữ cảnh gần đầy', pct);
   const already = st[sid] && st[sid] >= band;
-  if (!already) { st[sid] = band; writeState(st); }
+  if (!already) writeState({ [sid]: band }); // chỉ giữ phiên hiện tại, tệp không phình dần
   const level = ratio >= CRIT ? 'CAO' : 'TRUNG BÌNH';
   const ctxMsg = [
     `[context-guard] Ngữ cảnh phiên đã dùng ~${pct}% (${fmt(ctx.tokens)}/${fmt(win)} token), mức ${level}.`,

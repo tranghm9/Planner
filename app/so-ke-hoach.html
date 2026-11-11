@@ -708,18 +708,21 @@ function ingest(items, sourceText) {
 /* local fallback when AI is not available */
 const NORM = s => String(s || '').toLowerCase().normalize('NFC');
 function parseVN(s) {
-  const x = NORM(s), now = new Date(); let date = null, time = null;
+  const raw = String(s || '').normalize('NFC'), x = NORM(raw), now = new Date(); let date = null, time = null;
   if (/hôm nay|tối nay|sáng nay|chiều nay|trưa nay/.test(x)) date = ymd(now);
-  if (/ngày mai|\bmai\b/.test(x)) date = ymd(addDays(now, 1));
+  // "mai" = ngày mai. Tên riêng "Mai" (viết hoa, không đứng đầu câu, ví dụ "gọi chị Mai") thì bỏ qua.
+  if (/ngày mai/.test(x) || /(?<![\p{L}\p{N}])mai(?![\p{L}\p{N}])/u.test(raw) || /^\s*Mai(?![\p{L}\p{N}])/u.test(raw)) date = ymd(addDays(now, 1));
   if (/ngày kia|\bmốt\b/.test(x)) date = ymd(addDays(now, 2));
   const wd = x.match(/(thứ\s*(hai|ba|tư|năm|sáu|bảy|[2-7])|chủ nhật|\bcn\b)/);
   if (wd) { const map = { 'hai':1,'ba':2,'tư':3,'năm':4,'sáu':5,'bảy':6,'2':1,'3':2,'4':3,'5':4,'6':5,'7':6 };
     const target = wd[2] ? map[wd[2]] : 0; let diff = (target - now.getDay() + 7) % 7; if (/tuần sau|tuần tới/.test(x)) diff += 7; date = ymd(addDays(now, diff)); }
-  const dmm = x.match(/\b(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?\b/);
-  if (dmm) { const d = +dmm[1], m = +dmm[2]; let y = dmm[3] ? +dmm[3] : now.getFullYear(); if (y < 100) y += 2000;
+  // Ngày dạng 15/12 hoặc 15/12/2026. Dấu "." và "-" chỉ tính khi có cả năm, để "3.5 triệu" hay "2-3 hộp" không bị hiểu thành ngày.
+  const dmm = x.match(/\b(\d{1,2})([\/\-.])(\d{1,2})(?:[\/\-.](\d{2,4}))?\b/);
+  if (dmm && (dmm[2] === '/' || dmm[4])) { dmm.splice(2, 1); const d = +dmm[1], m = +dmm[2]; let y = dmm[3] ? +dmm[3] : now.getFullYear(); if (y < 100) y += 2000;
     if (d >= 1 && d <= 31 && m >= 1 && m <= 12) { let c = new Date(y, m-1, d); if (!dmm[3] && c < addDays(now, -1)) c = new Date(y+1, m-1, d); date = ymd(c); } }
-  const tm = x.match(/\b(\d{1,2})\s*(?:h|g|giờ|:)\s*(\d{2})?(?!\d)/);
-  if (tm) { let h = +tm[1]; const mi = tm[2] ? +tm[2] : 0; if (/chiều|tối/.test(x) && h < 12) h += 12; if (h < 24 && mi < 60) time = `${pad(h)}:${pad(mi)}`; }
+  // Giờ: "3h", "3h30", "9 giờ 30", "8g sáng", "14:30". Chữ h/g phải đứng riêng, để "2 hộp", "5 gói" không thành giờ.
+  const tm = x.match(/(?<![\d\/.,:-])(\d{1,2})\s*(?:(?:giờ|h|g)(?![\p{L}])\s*(\d{2})?|:(\d{2}))(?!\d)/u);
+  if (tm) { let h = +tm[1]; const mi = +(tm[2] || tm[3] || 0); if (/chiều|tối/.test(x) && h < 12) h += 12; if (h < 24 && mi < 60) time = `${pad(h)}:${pad(mi)}`; }
   return { date, time };
 }
 function guessCat(s) {
@@ -1230,7 +1233,7 @@ function debtTodayHtml() {
   if (!soon.length && !late.length) return '';
   return `<section class="card sk"><div class="card-h"><h2>Nợ cần chú ý</h2><button class="btn ghost sm" data-go="debt">Mở Sổ nợ →</button></div>
     ${late.slice(0, 3).map((i) => dueRow(i, t, true, true)).join('')}${soon.slice(0, 4).map((i) => dueRow(i, t, false, true)).join('')}
-    ${late.length + soon.length > 7 ? `<p class="hint" style="margin-top:6px">Còn ${late.length + soon.length - 7} khoản nữa trong Sổ nợ.</p>` : ''}</section>`;
+    ${late.length > 3 || soon.length > 4 ? `<p class="hint" style="margin-top:6px">Còn ${Math.max(0, late.length - 3) + Math.max(0, soon.length - 4)} khoản nữa trong Sổ nợ.</p>` : ''}</section>`;
 }
 function stackSvg(sp, W) {
   const H = 210, L = 46, R = 10, T = 22, B = 26, n = sp.labels.length, max = niceMax(Math.max(1, ...sp.totals)), iw = W - L - R, step = iw / n, bw = Math.min(34, step * 0.62);
@@ -1473,16 +1476,17 @@ function viewWeek() {
   const days = Array.from({ length: 7 }, (_, i) => ymd(addDays(ws, i))), t = today(), end = days[6] < t ? days[6] : t;
   const prevDays = days.map(d => ymd(addDays(parseYmd(d), -7)));
   const cnt = days.map(dayCount), pc = prevDays.map(dayCount);
-  const done = cnt.reduce((a, c) => a + c.done, 0), total = cnt.reduce((a, c) => a + c.total, 0), pdone = pc.reduce((a, c) => a + c.done, 0);
-  const hr = days[0] <= t ? habitRate(days[0], end) : { rate: 0, total: 0 }, phr = habitRate(prevDays[0], prevDays[6]);
+  // Tuần đang chạy chỉ so với cùng số ngày của tuần trước (thứ Hai không bị so với cả tuần trước).
+  const ti = days.indexOf(t), upTo = ti >= 0 ? ti : 6, cmp = upTo < 6 ? 'cùng kỳ tuần trước' : 'tuần trước';
+  const done = cnt.reduce((a, c) => a + c.done, 0), total = cnt.reduce((a, c) => a + c.total, 0), pdone = pc.slice(0, upTo + 1).reduce((a, c) => a + c.done, 0);
+  const hr = days[0] <= t ? habitRate(days[0], end) : { rate: 0, total: 0 }, phr = habitRate(prevDays[0], prevDays[upTo]);
   const best = cnt.reduce((b, c, i) => c.done > b.v ? { v: c.done, i } : b, { v: 0, i: -1 });
   const notes = [];
   if (days[0] <= t) {
-    notes.push(done >= pdone ? `Xong nhiều hơn tuần trước ${done - pdone} việc.` : `Xong ít hơn tuần trước ${pdone - done} việc, thử chia nhỏ việc để dễ hoàn thành hơn.`);
-    if (hr.total && phr.total) notes.push(hr.rate >= phr.rate ? `Thói quen tăng ${hr.rate - phr.rate} điểm so với tuần trước.` : `Thói quen giảm ${phr.rate - hr.rate} điểm so với tuần trước, hãy tích đều hơn.`);
+    if (done || pdone) notes.push(done > pdone ? `Xong nhiều hơn ${cmp} ${done - pdone} việc.` : done === pdone ? `Xong bằng ${cmp} (${done} việc).` : `Xong ít hơn ${cmp} ${pdone - done} việc, thử chia nhỏ việc để dễ hoàn thành hơn.`);
+    if (hr.total && phr.total) notes.push(hr.rate > phr.rate ? `Thói quen tăng ${hr.rate - phr.rate} điểm so với ${cmp}.` : hr.rate === phr.rate ? `Thói quen giữ bằng ${cmp}.` : `Thói quen giảm ${phr.rate - hr.rate} điểm so với ${cmp}, hãy tích đều hơn.`);
     if (best.i >= 0) notes.push(`Ngày hiệu quả nhất: ${WD[parseYmd(days[best.i]).getDay()]} (${best.v} việc xong).`);
   }
-  const ti = days.indexOf(t);
   const spec = { labels: days.map(d => WDS[parseYmd(d).getDay()]), full: days.map(d => fmtDate(d)), xName: 'Ngày', hl: ti, endIdx: ti >= 0 ? ti : 6,
     series: [{ name: 'Đã xong', color: '--s1', values: cnt.map(c => c.done) }, { name: 'Tổng việc', color: '--s2', values: cnt.map(c => c.total) }],
     tip: i => `${fmtDate(days[i])}: ${cnt[i].done}/${cnt[i].total} việc xong`, aria: 'Tiến độ từng ngày trong tuần' };
@@ -1491,7 +1495,7 @@ function viewWeek() {
     <div class="kpis"><div class="kpi"><span class="lbl">Đã xong</span><span class="val num">${done}<small>/${total}</small></span></div>
       <div class="kpi"><span class="lbl">Thói quen</span><span class="val num">${hr.rate}%</span></div>
       <div class="kpi"><span class="lbl">Hôm nay</span><span class="val num">${dayCount(t).total}<small> việc</small></span></div></div>
-    ${notes.length ? `<p style="margin:12px 0 0"><b>${done >= pdone ? 'Khá tốt, giữ nhịp này nhé.' : 'Tuần này hơi chậm một chút.'}</b><br><span class="muted">${esc(notes.join(' '))}</span></p>` : ''}</section>
+    ${notes.length ? `<p style="margin:12px 0 0"><b>${done > pdone ? 'Khá tốt, giữ nhịp này nhé.' : done === pdone ? 'Đang giữ nhịp như tuần trước.' : 'Tuần này hơi chậm một chút.'}</b><br><span class="muted">${esc(notes.join(' '))}</span></p>` : ''}</section>
     ${chartCard('week', 'Tiến độ từng ngày', spec)}
     <p class="sec-label">Công việc trong tuần</p>
     <div class="week">${days.map(ds => { const d = parseYmd(ds), it = tasksOn(ds).sort(byDay);
@@ -1607,7 +1611,7 @@ function viewStats() {
   return `<section class="card sk"><div class="card-h"><h2>Thống kê</h2><div class="seg" role="group" aria-label="Khoảng thời gian">${[4, 8, 12].map(n => `<button data-act="st-w" data-n="${n}" aria-pressed="${W === n}">${n} tuần</button>`).join('')}</div></div>
       <p class="sec-label">Tỉ lệ hoàn thành việc · ${W} tuần qua</p>
       <div class="row" style="align-items:baseline;gap:12px"><span class="big num">${cur.rate}%</span><span class="num ${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '▲ +' : '▼ '}${delta} điểm</span><span class="muted">so với ${W} tuần trước đó</span></div>
-      <p class="hint num">${cur.done}/${cur.total} việc · hiệu quả nhất: ${WD[bestWd]}</p></section>
+      <p class="hint num">${cur.done}/${cur.total} việc · hiệu quả nhất: ${Math.max(...wdAvg) > 0 ? WD[bestWd] : 'chưa có'}</p></section>
     <div class="kpis">
       <div class="card sk kpi"><span class="lbl">Việc đã xong</span><span class="val num">${cur.done}</span><span class="d num">${cur.done - prev.done >= 0 ? '+' : ''}${cur.done - prev.done} so với kỳ trước</span></div>
       <div class="card sk kpi"><span class="lbl">Chuỗi hoạt động</span><span class="val num">${st.cur}<small> ngày</small></span><span class="d num">Dài nhất ${st.best} ngày</span></div>
@@ -1656,7 +1660,7 @@ function viewSettings() {
     <div class="set"><div class="lbl"><b>Nhắc hẹn cho mọi việc</b><span>Tải một file lịch chứa mọi việc có ngày, kèm giờ nhắc. Mở file để thêm vào Lịch iPhone, Google Lịch hoặc Outlook.</span></div>
       <button class="btn sm" data-act="ics-all">Tải file lịch</button></div>
     <div class="set"><div class="lbl"><b>Trí nhớ của app</b><span class="num">App đã ghi nhớ ${exN} lần bạn phân loại.</span></div>
-      <button class="btn sm danger" data-act="forget">${S.confirmForget ? 'Bấm lần nữa để xóa' : 'Xóa trí nhớ'}</button></div>
+      <button class="btn sm danger" data-act="forget">Xóa trí nhớ</button></div>
     <div class="set"><div class="lbl"><b>Nơi lưu dữ liệu</b><span>${esc(store)}</span></div></div>
   </section>
   ${debtSettingsHtml()}
@@ -1682,7 +1686,7 @@ function render() {
   renderNav();
   const v = VIEWS.find(x => x[0] === S.view) || VIEWS[0];
   $('#page-title').textContent = v[1];
-  const d = new Date(); $('#today-line').textContent = `${WD[d.getDay()]}, ${dmY(d)} · âm lịch ${lunarLabel(d)} · năm ${CAN[d.getFullYear() % 10]} ${CHI[d.getFullYear() % 12]}`;
+  const d = new Date(); $('#today-line').textContent = `${WD[d.getDay()]}, ${dmY(d)} · âm lịch ${lunarLabel(d)} · năm ${CAN[lunar(d).y % 10]} ${CHI[lunar(d).y % 12]}`;
   $('#capture').hidden = S.view !== 'today';
   const el = $('#view');
   if (S.loading) { el.innerHTML = `<div class="empty"><span class="busy" style="justify-content:center"><span class="spin"></span>Đang mở sổ của bạn…</span></div>`; return; }
@@ -1834,7 +1838,7 @@ document.addEventListener('click', e => {
     case 'confirm': { const t = S.tasks.get(id); if (!t) break; t.cat = el.dataset.cat; t.status = 'open'; t.auto = false; t.newCat = null; learn(t.title + ' ' + t.notes, t.cat); put('tasks', t);
       toast(learnedCount(t.cat) === LEARN_N ? `App đã hiểu nhóm “${catOf(t).name}”. Từ giờ sẽ tự xếp việc tương tự.` : `Đã xếp vào “${catOf(t).name}”.`); render(); break; }
     case 'confirm-new': { const t = S.tasks.get(id); if (!t || !t.newCat) break; const c = addCategory(t.newCat); if (!c) break; t.cat = c.id; t.status = 'open'; t.auto = false; t.newCat = null; learn(t.title + ' ' + t.notes, c.id); put('tasks', t); toast(`Đã tạo danh mục “${c.name}”.`); render(); break; }
-    case 'discard': del('tasks', id); render(); break;
+    case 'discard': { const t = S.tasks.get(id); if (!t) break; const copy = clone(t); del('tasks', id); render(); toast('Đã bỏ “' + t.title.slice(0, 40) + '”.', () => { put('tasks', copy); render(); }); break; }
     case 'rm-img': { const k = +el.dataset.i, it = S.images[k]; if (it) URL.revokeObjectURL(it.url); S.images.splice(k, 1); renderThumbs(); break; }
     case 'welcomed': S.settings.welcomed = true; persistSettings(); render(); break;
     case 'clear-ex': COLLS.forEach(c => [...S[c].values()].filter(x => x.isExample).forEach(x => del(c, x.id))); render(); toast('Đã xóa tất cả ví dụ.'); break;

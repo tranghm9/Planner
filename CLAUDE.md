@@ -3,7 +3,7 @@
 Claude đọc tệp này đầu tiên trong mỗi phiên. Dự án đặt trong `01_PROJECTS/<tên-dự-án>/`.
 
 ## 1. Khi bắt đầu phiên làm việc
-1. Đọc `CURRENT.md` để biết ưu tiên và dự án đang hoạt động.
+1. Đọc `CURRENT.md` để biết ưu tiên và dự án đang hoạt động, và `MEMORY.md` (giọng văn, nguyên tắc).
 2. Xác định dự án liên quan đến yêu cầu.
 3. Đọc `PROJECT.md`, `DECISIONS.md`, `TASKS.md` của dự án đó.
 4. Chỉ lấy reference cần thiết cho công việc đang làm.
@@ -44,12 +44,12 @@ Claude đọc tệp này đầu tiên trong mỗi phiên. Dự án đặt trong 
 
 ## 7. Riêng repo này
 - Mã nguồn app Sổ Kế Hoạch nằm ở `app/` (không theo quy tắc bản nháp `_v01`; sửa trực tiếp, lịch sử nằm trong git). `WORKING/` và `OUTPUT/` dùng cho tài liệu (đặc tả, hướng dẫn, báo cáo).
-- App là artifact riêng tư https://claude.ai/artifact/Wemqe6QXbDUAJRH7dGWNHP, đăng bằng công cụ Artifact với `file_path` = `app/so-ke-hoach.html` (kèm `files`: `lib/no/*.js`, `fixtures/no/sample.json` khi các tệp đó đổi).
-- `app/lib/no/` chép nguyên văn từ `tranghm9/FA-report`; không sửa. Test: `npm test` (74 test).
+- App là artifact riêng tư https://claude.ai/artifact/Wemqe6QXbDUAJRH7dGWNHP, đăng bằng công cụ Artifact với `file_path` = `app/so-ke-hoach.html` (kèm `files`: `lib/no/*.js`, `fixtures/no/sample.json` khi các tệp đó đổi). Khi đăng lại **không** truyền `capabilities` để giữ nguyên quyền đang có (lưu dữ liệu, AI, giọng nói, tải tệp, Google Sheets).
+- `app/lib/no/` chép nguyên văn từ `tranghm9/FA-report`; không sửa. Ngoại lệ: `sheets-source.js` và `vault-store.js` là tệp riêng của repo này, được sửa. Test: `npm test` (phải đạt hết).
 - Làm trên nhánh làm việc, không commit lên `main`.
 
 ## 8. Tiết kiệm token
-1. Không đọc cả `app/so-ke-hoach.html` (~50 nghìn token): Grep `-n` rồi Read theo `offset`/`limit`; sửa nhỏ bằng Edit hoặc `edits` của Artifact.
+1. Không đọc cả `app/so-ke-hoach.html` (hơn 100 nghìn token khi đọc bằng Read): Grep `-n` rồi Read theo `offset`/`limit`; sửa nhỏ bằng Edit hoặc `edits` của Artifact.
 2. Không đọc lại tệp trong `app/lib/no/`; chạy test chỉ in dòng tổng: `npm test 2>&1 | grep -E "^# (pass|fail)"`.
 3. Mỗi thay đổi giao diện tối đa một ảnh chụp kiểm tra (400px, `deviceScaleFactor: 1`); ưu tiên kiểm tra bằng số liệu/DOM.
 4. Không mở lại PDF/ảnh/tài liệu dài đã đọc; đọc bản tóm tắt trong `02_REFERENCES/`.

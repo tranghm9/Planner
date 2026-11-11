@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rà soát dự án Planner</title>
+<style>
+:root{--bg:#fbf7f8;--surface:#fff;--ink:#2a2226;--muted:#75686e;--line:#eadfe3;--rose:#c2477a;--rose-soft:#fbe6ee;--ok:#1f7a55;--ok-soft:#e2f4ec;--warn:#9a6208;--warn-soft:#fdf0d8;--danger:#b3362f;--danger-soft:#fbe4e2;--info:#3a63a8;--info-soft:#e6edf9}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1b1518;--surface:#261d21;--ink:#f3e9ed;--muted:#b3a3aa;--line:#3d3036;--rose:#f08db2;--rose-soft:#3d2430;--ok:#7fd3ab;--ok-soft:#1d3a2e;--warn:#f0c26e;--warn-soft:#3f3117;--danger:#f29a93;--danger-soft:#442220;--info:#9db9ee;--info-soft:#222f47}}
+:root[data-theme="dark"]{--bg:#1b1518;--surface:#261d21;--ink:#f3e9ed;--muted:#b3a3aa;--line:#3d3036;--rose:#f08db2;--rose-soft:#3d2430;--ok:#7fd3ab;--ok-soft:#1d3a2e;--warn:#f0c26e;--warn-soft:#3f3117;--danger:#f29a93;--danger-soft:#442220;--info:#9db9ee;--info-soft:#222f47}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:28px 16px 120px}
+h1{font-size:28px;line-height:1.25;margin:0 0 6px;text-wrap:balance}
+h2{font-size:21px;margin:44px 0 6px;padding-top:8px}
+h3{font-size:16px;margin:0}
+p{margin:6px 0}
+.lead{color:var(--muted);margin:0 0 20px}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:18px 0}
+.sum div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.sum b{display:block;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.sum span{color:var(--muted);font-size:14px}
+.note{background:var(--info-soft);border-radius:12px;padding:12px 14px;margin:14px 0}
+.group{color:var(--muted);font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:26px 0 8px}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:10px 0}
+.item .head{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.id{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;font-weight:700}
+.tag{font-size:12px;font-weight:700;border-radius:99px;padding:1px 9px;white-space:nowrap}
+.hi{background:var(--danger-soft);color:var(--danger)}.md{background:var(--warn-soft);color:var(--warn)}.lo{background:var(--info-soft);color:var(--info)}.done{background:var(--ok-soft);color:var(--ok)}
+.item p{font-size:15px}
+.item .k{color:var(--muted);font-weight:600}
+.rec{background:var(--rose-soft);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:15px}
+.pick{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.pick label{border:1.5px solid var(--line);border-radius:99px;padding:4px 12px;font-size:14px;cursor:pointer;user-select:none}
+.pick input{position:absolute;opacity:0;pointer-events:none}
+.pick label:has(input:checked){border-color:var(--rose);background:var(--rose-soft);color:var(--rose);font-weight:700}
+.pick label:has(input:focus-visible){outline:2px solid var(--rose);outline-offset:2px}
+ul{margin:6px 0;padding-left:20px}li{margin:3px 0}
+code{background:var(--line);border-radius:5px;padding:0 5px;font-size:.92em;overflow-wrap:anywhere}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:10px 16px}
+.bar div{max-width:860px;margin:0 auto;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.bar span{font-size:14px;color:var(--muted)}
+button{font:inherit;font-weight:700;border:0;border-radius:99px;padding:9px 18px;background:var(--rose);color:var(--surface);cursor:pointer}
+textarea{width:100%;min-height:150px;margin-top:10px;font:14px/1.5 ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);color:var(--ink)}
+</style>
+</head>
+<body>
+<main>
+<h1>Rà soát dự án Planner</h1>
+<p class="lead">Ngày 11/11/2026 · Sổ Kế Hoạch, hook, quy tắc cho Claude và các skill liên quan</p>
+
+<div class="sum">
+  <div><b>14</b><span>điểm đã sửa xong</span></div>
+  <div><b>19</b><span>điểm chờ bạn duyệt</span></div>
+  <div><b>74/74</b><span>bài kiểm tra tự động đạt</span></div>
+</div>
+
+<div class="note"><b>Cách duyệt:</b> với mỗi đề xuất ở phần 2, chạm <b>Đồng ý</b>, <b>Không</b> hoặc <b>Hỏi thêm</b>. Xong thì bấm <b>Sao chép lựa chọn</b> ở cuối trang và dán vào khung chat với Claude. Không chọn mục nào thì mình giữ nguyên mục đó.</div>
+
+<div class="note" style="background:var(--warn-soft)"><b>Lưu ý quan trọng:</b> các lỗi của app đã sửa trong mã nguồn nhưng <b>chưa lên app bạn đang dùng</b>. Cần bạn đồng ý mục A1 thì mình mới đăng lại.</div>
+
+<h2>1. Đã sửa xong</h2>
+<p class="lead">Những chỗ mình chắc chắn là lỗi. Đã kiểm tra lại bằng trình duyệt giả lập (điện thoại 400px) và bộ kiểm tra tự động.</p>
+
+<p class="group">App Sổ Kế Hoạch · khi gõ nhanh một việc</p>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>“Mua 2 hộp sữa” bị đặt giờ 02:00</h3></div>
+<p>Chữ “h” trong “hộp”, “g” trong “gói” bị hiểu là giờ. Giờ chỉ nhận khi viết riêng: “3h”, “3h30”, “8g sáng”, “9 giờ 30”, “14:30”.</p></div>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>“9 giờ 30” bị mất số phút</h3></div>
+<p>Trước đây thành 09:00. Giờ thành 09:30.</p></div>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>“Gọi chị Mai” bị xếp sang ngày mai</h3></div>
+<p>Tên riêng “Mai” viết hoa, đứng giữa câu, không còn bị hiểu là “ngày mai”. Chữ “mai” viết thường và “Mai” đứng đầu câu vẫn là ngày mai.</p></div>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>“Trả 3.5 triệu” bị xếp vào ngày 3/5 năm sau</h3></div>
+<p>Số có dấu chấm hoặc gạch ngang (“3.5”, “2-3 hộp”) không còn bị hiểu là ngày. Ngày viết “15/12” hoặc đủ năm “15.12.2026” vẫn nhận.</p></div>
+
+<p class="group">App Sổ Kế Hoạch · hiển thị</p>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>Tên năm can chi sai trong tháng 1–2 dương lịch</h3></div>
+<p>Dòng ngày ở đầu trang lấy năm dương lịch để gọi tên năm. Ví dụ tháng 1/2027 (chưa Tết) sẽ ghi “Đinh Mùi” trong khi vẫn là năm Bính Ngọ. Giờ tính theo năm âm lịch.</p></div>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>Khung “Nợ cần chú ý” có thể giấu bớt khoản nợ mà không báo</h3></div>
+<p>Khung chỉ hiện tối đa 3 khoản quá hạn và 4 khoản sắp đến hạn. Khi có 1 khoản quá hạn và 6 khoản sắp đến hạn, 2 khoản bị ẩn mà không có dòng “Còn … khoản nữa”. Giờ đếm đúng.</p></div>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>Kế hoạch tuần: sáng thứ Hai luôn bị chê “hơi chậm”</h3></div>
+<p>App so số việc xong của tuần đang chạy với <b>cả</b> tuần trước. Giờ so với cùng số ngày của tuần trước. Tuần chưa có gì thì không còn khen “Khá tốt”.</p></div>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>Thống kê ghi “hiệu quả nhất: Thứ Hai” khi chưa có dữ liệu</h3></div>
+<p>Giờ ghi “chưa có”.</p></div>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>Nút “Bỏ” ở khung phân loại xóa việc ngay, không lấy lại được</h3></div>
+<p>Thêm nút “Hoàn tác” trong 6 giây, giống nút xóa ở các danh sách khác.</p></div>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>Dọn một đoạn mã không còn tác dụng</h3></div>
+<p>Nhãn “Bấm lần nữa để xóa” của nút Xóa trí nhớ có một nhánh không bao giờ chạy.</p></div>
+
+<p class="group">Hook tự lưu và quy tắc cho Claude</p>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>Hook đo độ đầy ngữ cảnh có thể đọc nhầm số của agent phụ</h3></div>
+<p>Giờ bỏ qua lượt của agent phụ. Tệp ghi nhớ trạng thái cũng không còn phình dần theo số phiên.</p></div>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>CLAUDE.md không nhắc đọc MEMORY.md khi bắt đầu phiên</h3></div>
+<p>Quy tắc yêu cầu “luôn áp dụng MEMORY.md” nhưng bước mở đầu không có tệp này, nên Claude có thể bỏ sót giọng văn và nguyên tắc riêng tư. Đã thêm vào bước 1.</p></div>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>CLAUDE.md: ba chỗ chưa chính xác</h3></div>
+<ul>
+<li>Ghi tệp app tốn “~50 nghìn token”; đo thực tế trong phiên này là <b>hơn 100 nghìn</b>. Đã sửa số để quy tắc “không đọc cả tệp” có sức nặng đúng.</li>
+<li>Ghi “<code>app/lib/no/</code> không sửa” nhưng thư mục này có 2 tệp riêng của dự án được phép sửa. Đã ghi rõ ngoại lệ.</li>
+<li>Thêm lưu ý khi đăng lại app: không truyền lại danh sách quyền, để app giữ nguyên quyền đang có.</li>
+</ul></div>
+<div class="item"><div class="head"><span class="tag done">Đã sửa</span><h3>README trống; CURRENT.md lệch ngày</h3></div>
+<p>README chỉ có một dòng tiêu đề, đã thêm mô tả ngắn. CURRENT.md ghi 10/11 trong khi đã có thay đổi ngày 11/11. Đã cập nhật cùng TASKS.md.</p></div>
+
+<h2>2. Chờ bạn duyệt</h2>
+<p class="lead">Những chỗ mình chưa chắc, hoặc cần bạn quyết vì ảnh hưởng tới cách bạn dùng.</p>
+
+<p class="group">A · App Sổ Kế Hoạch</p>
+
+<div class="item" data-id="A1" data-t="Đăng lại app"><div class="head"><span class="id">A1</span><span class="tag hi">Nên làm ngay</span><h3>Đăng bản đã sửa lên app bạn đang dùng</h3></div>
+<p><span class="k">Vấn đề:</span> 10 điểm sửa ở phần 1 mới nằm trong mã nguồn. App trên thanh bên Claude vẫn là bản cũ.</p>
+<p><span class="k">Chưa kiểm tra:</span> mình chưa so bản đang chạy với mã nguồn trong repo, và chưa thử trên iPhone thật.</p>
+<div class="rec"><b>Đề xuất:</b> đồng ý để mình đăng lại. Dữ liệu của bạn không bị ảnh hưởng.</div></div>
+
+<div class="item" data-id="A2" data-t="Báo khi lưu thất bại"><div class="head"><span class="id">A2</span><span class="tag hi">Quan trọng</span><h3>Lưu thất bại nhưng app im lặng</h3></div>
+<p><span class="k">Vấn đề:</span> khi ghi dữ liệu gặp lỗi lạ (không phải hết dung lượng hay mất mạng tạm thời), app không báo gì. Bạn tưởng đã lưu nhưng mở máy khác sẽ không thấy. Ngoài ra một loại lỗi đang bị báo là “Bạn chỉ có quyền xem”, có thể không đúng nguyên nhân.</p>
+<p><span class="k">Vì sao chưa sửa:</span> mình không thử được trên kho dữ liệu thật của Claude để biết các mã lỗi cụ thể.</p>
+<div class="rec"><b>Đề xuất:</b> thêm thông báo “Chưa lưu được thay đổi vừa rồi” cho mọi lỗi chưa biết, và thử lưu lại một lần.</div></div>
+
+<div class="item" data-id="A3" data-t="Sổ nợ: 0 đ hay Không có"><div class="head"><span class="id">A3</span><span class="tag md">Chuyên môn</span><h3>Sổ nợ hiện “0 đ” ở ô “Khoản vay · 7 tháng”</h3></div>
+<p><span class="k">Vấn đề:</span> nguyên tắc của bạn là thiếu số thì ghi “Chưa có”, không ghi 0. Ô này hiện “0 đ” cả khi người đó không có khoản vay nào lẫn khi thiếu dữ liệu (phần thiếu được liệt kê riêng bên dưới biểu đồ).</p>
+<div class="rec"><b>Đề xuất:</b> không có khoản nào thì ghi “Không có”; thiếu dữ liệu thì ghi “Chưa có”; chỉ ghi “0 đ” khi thật sự bằng 0.</div></div>
+
+<div class="item" data-id="A4" data-t="Gộp cả hai khi thiếu một người"><div class="head"><span class="id">A4</span><span class="tag md">Chuyên môn</span><h3>Thẻ “Gộp cả hai” vẫn hiện khi chỉ một người có số</h3></div>
+<p><span class="k">Vấn đề:</span> nếu Sheet chỉ đủ số của Trang, thẻ “Gộp cả hai” thực ra chỉ là số của Trang nhưng không có ghi chú.</p>
+<div class="rec"><b>Đề xuất:</b> thêm dòng “Chưa gồm … vì thiếu dữ liệu” ngay trên thẻ.</div></div>
+
+<div class="item" data-id="A5" data-t="Việc lặp ngày 29-31"><div class="head"><span class="id">A5</span><span class="tag md">Thiếu nhất quán</span><h3>Việc lặp hằng tháng vào ngày 29, 30, 31</h3></div>
+<p><span class="k">Vấn đề:</span> trong app, tháng không có ngày 31 thì việc rơi về ngày cuối tháng. Nhưng khi đưa sang lịch điện thoại hoặc Google Lịch, tháng đó bị bỏ qua. Hai nơi lệch nhau.</p>
+<div class="rec"><b>Đề xuất:</b> cho tệp lịch cũng dùng “ngày cuối tháng” khi việc đặt ngày 29–31.</div></div>
+
+<div class="item" data-id="A6" data-t="Xếp lịch bỏ sót việc"><div class="head"><span class="id">A6</span><span class="tag lo">Nhỏ</span><h3>“Xếp lịch giúp tôi” bỏ sót hai loại việc</h3></div>
+<p><span class="k">Vấn đề:</span> việc quá hạn đã có giờ từ hôm trước, và việc lặp lại chưa có giờ, không được gửi cho AI nên không được xếp.</p>
+<div class="rec"><b>Đề xuất:</b> đưa cả hai loại vào danh sách cần xếp.</div></div>
+
+<div class="item" data-id="A7" data-t="PIN: nhớ số lần sai"><div class="head"><span class="id">A7</span><span class="tag lo">Nhỏ</span><h3>Khóa PIN: tải lại trang là được thử lại từ đầu</h3></div>
+<p><span class="k">Vấn đề:</span> quy tắc “sai 3 lần phải chờ” chỉ nhớ khi trang đang mở. Người cầm máy có thể tải lại trang để thử tiếp.</p>
+<div class="rec"><b>Đề xuất:</b> lưu số lần sai và giờ được thử lại vào bộ nhớ máy. Mức rủi ro thấp vì PIN chỉ chống xem lén.</div></div>
+
+<div class="item" data-id="A8" data-t="Tệp lịch .ics dòng dài"><div class="head"><span class="id">A8</span><span class="tag lo">Nhỏ</span><h3>Tệp lịch (.ics) ngắt dòng chưa đúng chuẩn với chữ có dấu</h3></div>
+<p><span class="k">Vấn đề:</span> chuẩn yêu cầu mỗi dòng tối đa 75 byte; app ngắt theo 60 ký tự, chữ tiếng Việt có dấu có thể vượt. Đa số ứng dụng lịch vẫn đọc được.</p>
+<div class="rec"><b>Đề xuất:</b> bạn thử tải một nhắc hẹn có ghi chú dài trên iPhone. Nếu lỗi chữ thì mình sửa; không lỗi thì để nguyên.</div></div>
+
+<div class="item" data-id="A9" data-t="Tách tệp app"><div class="head"><span class="id">A9</span><span class="tag md">Tiết kiệm token</span><h3>Toàn bộ app nằm trong một tệp rất lớn</h3></div>
+<p><span class="k">Vấn đề:</span> tệp app nặng 192 KB. Đây là chỗ tốn token nhất của dự án: mỗi lần Claude phải đọc nhiều phần để sửa là mất hàng chục nghìn token.</p>
+<p><span class="k">Đánh đổi:</span> tách thành vài tệp (giao diện, Sổ nợ, biểu đồ) thì mỗi lần sửa đọc ít hơn, nhưng việc tách tốn một phiên làm việc và phải thử lại toàn bộ app.</p>
+<div class="rec"><b>Đề xuất:</b> chưa làm ngay. Làm khi bắt đầu tính năng lớn tiếp theo (ví dụ màn Khoản vay, Thẻ, Nhật ký).</div></div>
+
+<p class="group">B · Hook, thư mục và skill trong repo</p>
+
+<div class="item" data-id="B1" data-t="Gỡ skill watch"><div class="head"><span class="id">B1</span><span class="tag md">Không còn cần?</span><h3>Skill “watch” (xem video) trong repo</h3></div>
+<p><span class="k">Vấn đề:</span> skill này gồm 11 tệp, 138 KB, dùng để xem video YouTube. Nó không liên quan tới Sổ Kế Hoạch, cần cài thêm công cụ và khóa API mới chạy, và mỗi phiên làm việc trong repo đều tốn một ít token để nạp phần mô tả.</p>
+<div class="rec"><b>Đề xuất:</b> gỡ khỏi repo này nếu bạn không dùng để xem video ở đây. Cần lại thì cài lại được. Mình chưa gỡ vì đây là thứ bạn chủ động cài.</div></div>
+
+<div class="item" data-id="B2" data-t="Ngưỡng cảnh báo ngữ cảnh"><div class="head"><span class="id">B2</span><span class="tag md">Cần biết</span><h3>Cảnh báo 60% / 80% chỉ đúng với mô hình có ngữ cảnh 1 triệu token</h3></div>
+<p><span class="k">Vấn đề:</span> hook đang giả định ngữ cảnh 1 triệu token. Phiên này xác nhận giả định đó đúng (đã dùng hơn 240 nghìn mà chưa bị tóm tắt). Nhưng nếu bạn chuyển sang mô hình ngữ cảnh 200 nghìn, cuộc trò chuyện sẽ bị tóm tắt khi hook mới đo được khoảng 18%, nên hai mức cảnh báo không bao giờ hiện. Khi đó chỉ còn bước tự lưu trước khi tóm tắt.</p>
+<div class="rec"><b>Đề xuất:</b> giữ nguyên, và mình ghi thêm một dòng vào DECISIONS.md để lần sau đổi mô hình thì nhớ đổi số này.</div></div>
+
+<div class="item" data-id="B3" data-t="Tự lưu tạo nhiều commit"><div class="head"><span class="id">B3</span><span class="tag lo">Nhỏ</span><h3>Tự lưu khi ngữ cảnh trên 80% tạo nhiều bản lưu vụn</h3></div>
+<p><span class="k">Vấn đề:</span> từ 80% trở lên, mỗi lượt trả lời có thể tạo một bản lưu “Tự lưu tiến trình”. Lịch sử thay đổi sẽ dài và khó đọc, nhưng không mất việc.</p>
+<div class="rec"><b>Đề xuất:</b> giữ nguyên, an toàn quan trọng hơn gọn. Việc “tự lưu cuối mọi lượt” trong TASKS.md mình đề xuất <b>không bật</b>, vì sẽ còn vụn hơn.</div></div>
+
+<div class="item" data-id="B4" data-t="Sửa khung mẫu workspace"><div class="head"><span class="id">B4</span><span class="tag lo">Nhỏ</span><h3>Bộ khung mẫu trong 03_TEMPLATES thiếu bước đọc MEMORY.md</h3></div>
+<p><span class="k">Vấn đề:</span> bản CLAUDE.md mẫu (để chép sang workspace khác) có cùng thiếu sót mình vừa sửa ở bản chính. Quy tắc không cho mình tự sửa thư mục mẫu.</p>
+<div class="rec"><b>Đề xuất:</b> cho phép mình thêm đúng một dòng đó vào bản mẫu.</div></div>
+
+<p class="group">C · Các skill trong tài khoản Claude của bạn</p>
+<p style="font-size:15px;color:var(--muted)">Các skill này nằm trong tài khoản Claude, không nằm trong repo, nên mình chỉ đọc được, không sửa được từ đây. Nếu bạn đồng ý, mình soạn sẵn nội dung mới để bạn cập nhật trong phần Skill của Claude.</p>
+
+<div class="item" data-id="C1" data-t="Thống nhất nhãn Chưa có"><div class="head"><span class="id">C1</span><span class="tag md">Thiếu nhất quán</span><h3>Nhãn số liệu khác nhau giữa skill và app</h3></div>
+<p><span class="k">Vấn đề:</span> ba skill nợ dùng nhãn “Chưa biết”. App, MEMORY.md và tài liệu Sổ nợ dùng “Chưa có”, và có thêm nhãn “Gồm ước tính” mà skill không có.</p>
+<div class="rec"><b>Đề xuất:</b> dùng một bộ nhãn duy nhất ở mọi nơi: Đã xác nhận / Ước tính / Gồm ước tính / Chưa có.</div></div>
+
+<div class="item" data-id="C2" data-t="Thống nhất định nghĩa quá hạn"><div class="head"><span class="id">C2</span><span class="tag hi">Chuyên môn</span><h3>“Quá hạn” được định nghĩa khác nhau</h3></div>
+<p><span class="k">Skill theo-doi-no:</span> hạn <b>≤ hôm nay</b> và Nhật ký chưa có dòng <b>“Đã trả”</b>.</p>
+<p><span class="k">App Sổ nợ:</span> hạn <b>trước hôm nay</b> và Nhật ký <b>không có dòng nào</b> cho đúng khoản và hạn đó (kể cả dòng chưa phải “Đã trả”).</p>
+<p><span class="k">Hệ quả:</span> khoản đến hạn đúng hôm nay, hoặc khoản đã ghi Nhật ký nhưng trạng thái khác “Đã trả”, sẽ được skill báo quá hạn còn app thì không.</p>
+<div class="rec"><b>Đề xuất:</b> bạn chọn một cách hiểu. Mình nghiêng về: “đến hạn hôm nay” là <i>đến hạn</i>, chưa phải quá hạn; và chỉ dòng “Đã trả” mới xóa cảnh báo quá hạn. Cách này cần sửa cả skill lẫn lớp tính toán gốc ở repo FA-report.</div></div>
+
+<div class="item" data-id="C3" data-t="Bỏ số ghi cứng trong skill"><div class="head"><span class="id">C3</span><span class="tag md">Chưa chính xác</span><h3>Skill cập nhật Sheet ghi cứng số liệu dễ lỗi thời</h3></div>
+<p><span class="k">Vấn đề:</span> skill ghi sẵn hạn mức và ngày chốt từng thẻ, mức 200.000 và phí 3% của công thức đáo, và câu “VPB tháng 10 và 11 đã chọn toàn bộ”. Trong khi đó skill điều phối lại dặn “luôn lấy số từ Sheet” và “hạn mức, ngày chốt có thể đã đổi”. Hai số của công thức đáo đã có sẵn ở tab Thông số của Sheet, app đang đọc từ đó.</p>
+<div class="rec"><b>Đề xuất:</b> trong skill chỉ giữ mã thẻ và tên thẻ. Hạn mức, ngày chốt, mức 200.000 và 3% đọc từ Sheet. Bỏ câu về VPB tháng 10–11 sau khi hết tháng 11.</div></div>
+
+<div class="item" data-id="C4" data-t="Mã Sheet lặp ở nhiều skill"><div class="head"><span class="id">C4</span><span class="tag md">Riêng tư</span><h3>Mã Google Sheet thật nằm ở hai skill, mã danh sách nhắc hẹn ở một skill</h3></div>
+<p><span class="k">Vấn đề:</span> nguyên tắc của bạn là không để mã Sheet trong mã nguồn. Repo đã sạch (mình đã tìm, không có). Nhưng mã Sheet được chép ở hai skill, và nội dung skill được nạp vào mọi phiên dùng tới nó.</p>
+<div class="rec"><b>Đề xuất:</b> chấp nhận để mã trong skill vì skill cần nó để chạy, nhưng chỉ ghi ở <b>một</b> nơi (skill điều phối). Skill còn lại ghi “lấy mã Sheet từ skill điều phối”.</div></div>
+
+<div class="item" data-id="C5" data-t="Rút gọn skill chi tiêu nhà"><div class="head"><span class="id">C5</span><span class="tag md">Tiết kiệm token</span><h3>Skill “cập nhật chi tiêu nhà” dài gấp 3 các skill khác</h3></div>
+<p><span class="k">Vấn đề:</span> 10,6 KB. Có đoạn nhập vai mở đầu không cần thiết, tên các bước và kết quả bằng tiếng Anh (INSPECT, QA Result, Passed, Completed) trong khi bạn dùng tiếng Việt, và có chỗ tự mâu thuẫn nhẹ: ghi bảng chi phí cố định kèm số tiền, rồi dặn “không hard-code”.</p>
+<div class="rec"><b>Đề xuất:</b> rút còn khoảng 7 KB: bỏ đoạn nhập vai, Việt hóa tên bước, giữ nguyên toàn bộ quy tắc nghiệp vụ và danh sách chênh lệch đã biết. Bảng chi phí cố định ghi rõ là “số tham khảo, luôn đối chiếu tháng gần nhất”.</div></div>
+
+<div class="item" data-id="C6" data-t="Đánh lại số quy tắc R"><div class="head"><span class="id">C6</span><span class="tag lo">Nhỏ</span><h3>Số thứ tự quy tắc bị đứt quãng</h3></div>
+<p><span class="k">Vấn đề:</span> skill nhắc hẹn có R1, R2, R3, R6; skill cập nhật Sheet có R7, R8, R9; không có R4, R5. Đây là dấu vết từ lúc tách một skill lớn thành ba. Không gây lỗi nhưng dễ khiến Claude đi tìm quy tắc không tồn tại.</p>
+<div class="rec"><b>Đề xuất:</b> bỏ ký hiệu R hoặc đánh số lại liền mạch.</div></div>
+
+<h2>3. Đã kiểm tra, thấy ổn</h2>
+<ul>
+<li><b>Bộ kiểm tra tự động:</b> 74/74 đạt, trước và sau khi sửa. Số chuẩn Sổ nợ khớp.</li>
+<li><b>Chạy thử app:</b> mở đủ 10 trang ở chiều rộng điện thoại, không có lỗi nào trong trình duyệt.</li>
+<li><b>Mã nguồn app:</b> không có kiểu dáng thừa, biến thừa, nút bấm không có xử lý, hay mã định danh trùng.</li>
+<li><b>Lịch âm:</b> ngày 11/11/2026 ra đúng mùng 3 tháng 10 năm Bính Ngọ.</li>
+<li><b>Riêng tư:</b> repo không chứa mã Sheet, mã danh sách nhắc hẹn hay email.</li>
+<li><b>Công thức đáo thẻ:</b> skill và app tính giống nhau.</li>
+<li><b>Hook tự lưu:</b> chạy thử trên dữ liệu phiên thật, đọc đúng số token; không lưu lên nhánh main.</li>
+<li><b>Skill “committed”, “no-td-nhac-hen”:</b> ngắn gọn, nội dung khớp với quyết định “app không tạo nhắc nợ”.</li>
+</ul>
+
+<h2>4. Chưa kiểm tra được</h2>
+<ul>
+<li>App trên iPhone thật, và kết nối Google Sheets với dữ liệu thật.</li>
+<li>Bản app đang chạy có giống mã nguồn trong repo không (xem mục A1).</li>
+<li>Lớp tính toán Sổ nợ có còn giống hệt repo gốc FA-report không: phiên này không được cấp quyền vào repo đó.</li>
+<li>Hai tác vụ định kỳ 12:00 và 20:00 nêu trong skill theo dõi nợ có đang chạy không.</li>
+<li>Các skill FWD và skill có sẵn của Claude: không thuộc dự án này nên mình không rà.</li>
+</ul>
+</main>
+
+<div class="bar"><div><span id="count">Chưa chọn mục nào</span><button id="copy" type="button">Sao chép lựa chọn</button></div></div>
+
+<script>
+(() => {
+  const OPTS = ['Đồng ý', 'Không', 'Hỏi thêm'];
+  const items = [...document.querySelectorAll('.item[data-id]')];
+  items.forEach(el => {
+    const id = el.dataset.id, box = document.createElement('div'); box.className = 'pick'; box.setAttribute('role', 'radiogroup'); box.setAttribute('aria-label', 'Lựa chọn cho ' + id);
+    box.innerHTML = OPTS.map(o => `<label><input type="radio" name="${id}" value="${o}">${o}</label>`).join('');
+    el.appendChild(box);
+  });
+  const summary = () => items.map(el => { const c = el.querySelector('input:checked'); return c ? `${el.dataset.id} (${el.dataset.t}): ${c.value}` : null; }).filter(Boolean);
+  const count = document.getElementById('count');
+  document.addEventListener('change', () => { const n = summary().length; count.textContent = n ? `Đã chọn ${n}/${items.length} mục` : 'Chưa chọn mục nào'; });
+  document.getElementById('copy').addEventListener('click', async () => {
+    const lines = summary();
+    const text = lines.length ? 'Lựa chọn của mình cho báo cáo rà soát 11/11:\n' + lines.join('\n') : '';
+    if (!text) { count.textContent = 'Hãy chọn ít nhất một mục trước'; return; }
+    try { await navigator.clipboard.writeText(text); count.textContent = 'Đã sao chép. Dán vào khung chat với Claude.'; }
+    catch { let ta = document.getElementById('out'); if (!ta) { ta = document.createElement('textarea'); ta.id = 'out'; ta.setAttribute('aria-label', 'Lựa chọn của bạn'); document.querySelector('main').appendChild(ta); } ta.value = text; ta.focus(); ta.select(); count.textContent = 'Hãy sao chép đoạn chữ ở cuối trang.'; }
+  });
+})();
+</script>
+</body>
+</html>
