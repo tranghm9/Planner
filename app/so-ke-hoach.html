@@ -509,9 +509,13 @@ async function drain(w) {
   w.running = true;
   while (w.next) { const f = w.next; w.next = null;
     try { await f(); } catch (e) {
-      if (e && e.code === 'invalid_argument' && !S.readOnly) { S.readOnly = true; toast('Bạn chỉ có quyền xem sổ này, thay đổi không được lưu.'); }
-      else if (e && e.code === 'quota_exceeded') toast('Bộ nhớ đã đầy. Hãy xóa bớt việc đã xong cũ.');
-      else if (e && e.code === 'unavailable') { await new Promise(r => setTimeout(r, 800 + Math.random() * 800)); try { await f(); } catch {} }
+      const code = e && e.code;
+      if (code === 'invalid_argument') { if (!S.readOnly) { S.readOnly = true; toast('Thay đổi vừa rồi chưa được lưu: sổ đang ở chế độ chỉ xem, hoặc dữ liệu không hợp lệ.'); } }
+      else if (code === 'quota_exceeded') toast('Bộ nhớ đã đầy. Hãy xóa bớt việc đã xong cũ.');
+      else { // lỗi tạm thời hoặc chưa rõ: thử lại một lần, vẫn hỏng thì báo chứ không im lặng
+        await new Promise(r => setTimeout(r, 800 + Math.random() * 800));
+        try { await f(); } catch { toast('Chưa lưu được thay đổi vừa rồi. Kiểm tra mạng rồi thử lại nhé.'); }
+      }
     } }
   w.running = false;
 }
@@ -822,7 +826,7 @@ async function planDay() {
   if (!AI.sample) { toast('Tính năng này cần AI. Hãy mở sổ trong Claude và cho phép dùng AI.'); return; }
   const t = today();
   const list = [...tasksOn(t).filter(x => !isDoneOn(x, t) && x.status !== 'review'), ...overdueTasks()];
-  const fixed = list.filter(x => x.time && (x.date === t || isRep(x))), loose = list.filter(x => !x.time && !isRep(x));
+  const fixed = list.filter(x => x.time && (x.date === t || isRep(x))), loose = list.filter(x => !fixed.includes(x));
   if (!loose.length) { toast('Các việc hôm nay đã có giờ cả rồi.'); return; }
   S.plan = { loading: true }; render(); planCtl = new AbortController();
   const prompt = `Bạn giúp một người Việt Nam xếp lịch trong ngày. Bây giờ là ${nowHM()}, ${WD[new Date().getDay()]} ${dmY(new Date())}. Ngày làm việc của họ từ ${S.settings.dayStart} đến ${S.settings.dayEnd}.
@@ -846,7 +850,8 @@ Trả lời CHỈ bằng JSON: {"plan":[{"id":"","time":"HH:MM","minutes":30,"mo
 function applyPlan() {
   if (!S.plan || !S.plan.rows) return; const t = today(), tm = ymd(addDays(new Date(), 1));
   for (const r of S.plan.rows) { const x = S.tasks.get(r.id); if (!x) continue;
-    if (r.tomorrow) x.date = tm; else if (r.time) { x.date = t; x.time = r.time; x.duration = r.minutes; }
+    if (isRep(x)) { if (r.tomorrow || !r.time) continue; x.time = r.time; x.duration = r.minutes; } // việc lặp: chỉ đặt giờ, không đổi ngày bắt đầu
+    else if (r.tomorrow) x.date = tm; else if (r.time) { x.date = t; x.time = r.time; x.duration = r.minutes; }
     put('tasks', x); }
   S.plan = null; toast('Đã xếp lịch cho hôm nay.'); render();
 }
@@ -855,7 +860,8 @@ function applyPlan() {
 const fmtLocal = d => `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
 const RR = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY' };
 const BYDAY = ['SU','MO','TU','WE','TH','FR','SA'];
-const rrule = t => RR[t.repeat] ? 'RRULE:FREQ=' + RR[t.repeat] + (t.repeat === 'weekly' && t.days && t.days.length ? ';BYDAY=' + t.days.map(d => BYDAY[d]).join(',') : '') : '';
+const monthEnd = t => { const d = t.repeat === 'monthly' && t.date ? parseYmd(t.date).getDate() : 0; return d >= 29 ? ';BYMONTHDAY=' + Array.from({ length: d - 27 }, (_, i) => 28 + i).join(',') + ';BYSETPOS=-1' : ''; };
+const rrule = t => RR[t.repeat] ? 'RRULE:FREQ=' + RR[t.repeat] + (t.repeat === 'weekly' && t.days && t.days.length ? ';BYDAY=' + t.days.map(d => BYDAY[d]).join(',') : '') + monthEnd(t) : '';
 function startOf(t) { const s = parseYmd(t.date); if (t.time) { const [h, m] = t.time.split(':').map(Number); s.setHours(h, m, 0, 0); } return s; }
 function gcalUrl(t) {
   const p = new URLSearchParams({ action: 'TEMPLATE', text: t.title });
@@ -868,7 +874,8 @@ function gcalUrl(t) {
   return 'https://calendar.google.com/calendar/render?' + p.toString();
 }
 const icsEsc = s => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
-const fold = line => { const out = []; let s = line; while (s.length > 60) { out.push(s.slice(0, 60)); s = ' ' + s.slice(60); } out.push(s); return out.join('\r\n'); };
+const utf8Len = (() => { const e = new TextEncoder(); return ch => e.encode(ch).length; })();
+const fold = line => { const out = []; let cur = '', n = 0; for (const ch of line) { const b = utf8Len(ch); if (n + b > (out.length ? 74 : 75)) { out.push(cur); cur = ''; n = 0; } cur += ch; n += b; } out.push(cur); return out.join('\r\n '); };
 function buildIcs(list) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
   const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//So Ke Hoach//VI', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:Sổ Kế Hoạch'];
@@ -1007,6 +1014,9 @@ const D = { lib: null, libErr: null, libP: null, d: null, warnings: [], source: 
   fails: 0, lockedUntil: 0, wipeArmed: false, pinMsg: '', conn: null };
 // Khóa PIN: secure.js (nguyên văn FA-report) trên chỗ lưu vault-store.js, ghi xuống meta/debt (riêng tư) hoặc bộ nhớ máy.
 const VS = { kv: null, sec: null, doc: undefined };
+const PIN_TRY = 'skh-pin-try';
+try { const o = JSON.parse(localStorage.getItem(PIN_TRY) || 'null'); if (o) { D.fails = Number(o.fails) || 0; D.lockedUntil = Number(o.until) || 0; } } catch {}
+const savePinTry = () => { try { D.fails ? localStorage.setItem(PIN_TRY, JSON.stringify({ fails: D.fails, until: D.lockedUntil })) : localStorage.removeItem(PIN_TRY); } catch {} };
 const AUTO_LOCK_MS = 60000;
 function flushVault(kv) {
   if (S.mode === 'db' && db) { const body = { kv, updatedAt: Date.now() }; queueWrite('debtcfg', () => db.doc('meta/debt').set(body)); }
@@ -1089,11 +1099,11 @@ async function unlockDebt(pin) {
   if (wait > 0) { D.pinMsg = `Thử lại sau ${wait} giây.`; render(); return; }
   if (!D.lib.PIN_RE.test(pin)) { D.pinMsg = 'Mã PIN gồm 6 đến 12 chữ số.'; render(); return; }
   D.pinMsg = 'Đang kiểm tra…'; render();
-  if (await VS.sec.unlock(pin)) { D.fails = 0; D.lockedUntil = 0; D.pinMsg = ''; D.wipeArmed = false; D.tried = false; render(); return; }
+  if (await VS.sec.unlock(pin)) { D.fails = 0; D.lockedUntil = 0; savePinTry(); D.pinMsg = ''; D.wipeArmed = false; D.tried = false; render(); return; }
   D.fails++;
   if (D.fails >= 3) { const sec = Math.min(300, 5 * 2 ** (D.fails - 3)); D.lockedUntil = Date.now() + sec * 1000; D.pinMsg = `Sai mã PIN. Chờ ${sec} giây rồi thử lại.`; }
   else D.pinMsg = 'Sai mã PIN.';
-  render();
+  savePinTry(); render();
 }
 function maybeAutoDebt() {
   if (D.autoTried || !D.cfgLoaded || pinLocked() || !sid() || !AI.mcp || !AI.perms) return; D.autoTried = true;
@@ -1155,9 +1165,10 @@ function debtOverview() {
   const people = D.person === 'Tất cả' ? DEBT_PEOPLE : [D.person];
   let combined = '';
   if (D.person === 'Tất cả') {
-    const ss = DEBT_PEOPLE.map((p) => L.debtSummary(d, p)).filter((s) => s.hasData);
+    const all = DEBT_PEOPLE.map((p) => [p, L.debtSummary(d, p)]), ss = all.filter(([, s]) => s.hasData).map(([, s]) => s), lack = all.filter(([, s]) => !s.hasData).map(([p]) => p);
     if (ss.length) { const loans = ss.reduce((a, s) => a + s.loans.total, 0), cards = ss.reduce((a, s) => a + s.cards.total, 0), dueNow = ss.reduce((a, s) => a + s.dueNow, 0);
-      combined = `<section class="card sk pink"><div class="card-h"><h2>Gộp cả hai (chỉ để xem)</h2>${debtTag(L.kindOf(cards, loans))}</div>
+      combined = `<section class="card sk pink"><div class="card-h"><h2>${lack.length ? 'Gộp (chưa đủ hai người)' : 'Gộp cả hai (chỉ để xem)'}</h2>${debtTag(L.kindOf(cards, loans))}</div>
+        ${lack.length ? `<p class="hint" style="color:var(--est)">Chưa gồm ${esc(lack.join(', '))}: Sheet chưa có số của người này.</p>` : ''}
         <div class="debt-big num">${esc(L.money(loans + cards))}</div>${fr('Khoản vay còn lại', loans, 'estimate')}${fr('Thẻ: dư nợ đến kỳ', cards, 'confirmed')}${fr('Đến kỳ (vay + thẻ)', dueNow, 'confirmed')}</section>`; }
     const others = due.items.filter((i) => !DEBT_PEOPLE.includes(i.chu));
     if (others.length) combined += `<div class="warnbox">${others.length} khoản có “Chủ” không phải Trang hoặc Dũng nên chưa xếp vào ai.</div>`;
@@ -1167,6 +1178,9 @@ function debtOverview() {
 function debtReport() {
   const L = D.lib, d = D.d, today = L.todayLocal(), p = D.person, r = L.buildReport(d, p, today, 7), sh = L.unitShares(r, D.scope, 6), h = L.buildHistory(d, p, today, 12);
   const m0 = r.months[0], t = r.totals;
+  // Ô tổng bằng 0: thiếu dữ liệu -> "Chưa có"; không có khoản nào -> "Không có"; còn lại mới là 0 thật.
+  const sums = (p === 'Tất cả' ? DEBT_PEOPLE : [p]).map((x) => L.debtSummary(d, x));
+  const kpiVal = (v, count) => v ? esc(L.money(v)) : r.missing.length ? '<span class="na">Chưa có</span>' : count ? esc(L.money(0)) : '<span class="na">Không có</span>';
   const issues = [...r.missing.map((x) => `Chưa tính: ${x}`), ...r.notes];
   const segs = [{ name: 'Khoản vay', color: '--ch0', key: 'vay', kind: 'confirmed', total: t.vay }, { name: 'Thẻ (đã xác nhận)', color: '--ch4', key: 'theOk', kind: 'confirmed', total: t.theOk }, { name: 'Thẻ (ước tính)', color: '--ch4', key: 'theEst', kind: 'estimate', total: t.theEst, striped: true }];
   const byP = (m) => (p === 'Tất cả' ? Object.entries(m.byPerson).map(([k, v]) => `${k} ${L.money(v)}`).join(' · ') : '');
@@ -1189,8 +1203,8 @@ function debtReport() {
     <div class="kpis">
       <div class="card sk kpi"><span class="lbl">Tổng 7 tháng</span><span class="val num">${t.all ? esc(L.money(t.all)) : '<span class="na">Chưa có</span>'}</span><span>${debtTag(L.kindOf(t.vay + t.theOk, t.theEst))}</span></div>
       <div class="card sk kpi"><span class="lbl">${esc(L.monthLong(m0.key))}</span><span class="val num">${m0.total ? esc(L.money(m0.total)) : '<span class="na">Chưa có</span>'}</span><span>${debtTag(L.kindOf(m0.vay + m0.theOk, m0.theEst))}</span></div>
-      <div class="card sk kpi"><span class="lbl">Khoản vay · 7 tháng</span><span class="val num">${esc(L.money(t.vay))}</span><span>${t.vay ? debtTag('confirmed') : ''}</span></div>
-      <div class="card sk kpi"><span class="lbl">Thẻ · 7 tháng</span><span class="val num">${esc(L.money(t.theOk + t.theEst))}</span><span>${debtTag(L.kindOf(t.theOk, t.theEst))}</span></div>
+      <div class="card sk kpi"><span class="lbl">Khoản vay · 7 tháng</span><span class="val num">${kpiVal(t.vay, sums.reduce((a, s) => a + s.loans.count, 0))}</span><span>${t.vay ? debtTag('confirmed') : ''}</span></div>
+      <div class="card sk kpi"><span class="lbl">Thẻ · 7 tháng</span><span class="val num">${kpiVal(t.theOk + t.theEst, sums.reduce((a, s) => a + s.cards.count, 0))}</span><span>${debtTag(L.kindOf(t.theOk, t.theEst))}</span></div>
     </div>
     <section class="card sk"><div class="card-h"><h2>Dự kiến phải trả theo tháng</h2>${modeSeg('dstack')}</div>
       <div class="plot" data-chart="dstack"></div>
@@ -1888,7 +1902,7 @@ document.addEventListener('click', e => {
     case 'debt-sample': loadDebt({ sample: true }); break;
     case 'debt-clear': saveDebtCfg(null).then((ok) => { render(); if (ok) toast('Sổ nợ đang dùng dữ liệu mẫu.'); }); break;
     case 'debt-lock': lockDebt(); toast('Đã khóa Sổ nợ.'); break;
-    case 'pin-forgot': if (!D.wipeArmed) { D.wipeArmed = true; render(); } else { VS.sec.wipe(); Object.assign(D, { wipeArmed: false, fails: 0, lockedUntil: 0, pinMsg: '', d: null, source: null, tried: false }); render(); toast('Đã xóa mã PIN và link Sheet. Dán lại link trong Cài đặt.'); } break;
+    case 'pin-forgot': if (!D.wipeArmed) { D.wipeArmed = true; render(); } else { VS.sec.wipe(); Object.assign(D, { wipeArmed: false, fails: 0, lockedUntil: 0, pinMsg: '', d: null, source: null, tried: false }); savePinTry(); render(); toast('Đã xóa mã PIN và link Sheet. Dán lại link trong Cài đặt.'); } break;
     case 'pin-open': pinSheet(el.dataset.v); break;
     case 'conn-guide': connGuide(); break;
     case 'conn-check': checkConn(); break;

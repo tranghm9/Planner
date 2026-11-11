@@ -3,7 +3,7 @@
 Tệp này là bộ quy tắc chung cho toàn bộ Workspace. Claude phải đọc tệp này đầu tiên trong mỗi phiên làm việc. Mỗi dự án đặt trong `01_PROJECTS/<tên-dự-án>/`.
 
 ## 1. Khi bắt đầu phiên làm việc
-1. Đọc `CURRENT.md` để biết ưu tiên và dự án đang hoạt động.
+1. Đọc `CURRENT.md` để biết ưu tiên và dự án đang hoạt động, và `MEMORY.md` (giọng văn, nguyên tắc).
 2. Xác định dự án liên quan đến yêu cầu.
 3. Đọc `PROJECT.md`, `DECISIONS.md`, `TASKS.md` của dự án đó.
 4. Chỉ lấy reference cần thiết cho công việc đang làm.
