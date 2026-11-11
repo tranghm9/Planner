@@ -7,6 +7,7 @@
 - [x] Sổ nợ: Tổng quan + Báo cáo tháng (đọc Google Sheet, số chuẩn mục 9 khớp), khóa PIN, hướng dẫn kết nối.
 - [x] Sửa biểu đồ trên iPhone; tick thói quen không nhảy trang; bảng thói quen tự cuộn tới hôm nay.
 - [x] Hook tự lưu + cảnh báo token; áp dụng quy tắc Claude Workspace.
+- [x] Khung vàng "Giúp mình phân loại": thêm nút Lưu để chốt luôn danh mục AI gợi ý (vẫn chạm danh mục khác để đổi).
 
 ## Đang chờ người dùng
 - [ ] Thử trên iPhone: biểu đồ, tick thói quen, kết nối Google Sheets thật (lần đầu Claude hỏi quyền).

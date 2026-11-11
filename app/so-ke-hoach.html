@@ -181,6 +181,7 @@ h1,h2,h3{margin:0;font-family:var(--display);text-wrap:balance;line-height:1.2}
 .choice.sug{border:2px solid var(--pen);font-weight:600}
 .choice.sug::after{content:"gợi ý";font-size:10.5px;font-weight:700;color:var(--rose);text-transform:uppercase;letter-spacing:.06em}
 .choice.new{border-style:dashed}
+.rv-save{justify-content:flex-end}
 
 /* habits today */
 .hab{display:flex;align-items:center;gap:10px;padding:8px 2px;border-top:1.5px dashed var(--line)}
@@ -1382,7 +1383,7 @@ function reviewHtml() {
   const r = reviewTasks(); if (!r.length) return '';
   return `<section class="card sk review" id="review" aria-labelledby="rv-h">
     <div class="card-h"><h2 id="rv-h">Giúp mình phân loại</h2><span class="muted num">${r.length} việc</span></div>
-    <p class="hint" style="margin-bottom:4px">Chạm vào danh mục đúng. Mỗi lần bạn chọn, app hiểu bạn hơn. Nhóm nào được chọn ${LEARN_N} lần trở lên, app sẽ tự xếp những việc tương tự.</p>
+    <p class="hint" style="margin-bottom:4px">Đúng gợi ý thì bấm Lưu; muốn đổi thì chạm vào danh mục khác. Mỗi lần bạn chốt, app hiểu bạn hơn. Nhóm nào được chọn ${LEARN_N} lần trở lên, app sẽ tự xếp những việc tương tự.</p>
     ${r.map(t => { const chips = cats().map(c => `<button class="choice${c.id === t.cat && !t.newCat ? ' sug' : ''}" style="--c:${esc(c.color)}" data-act="confirm" data-cat="${esc(c.id)}">${esc(c.name)}</button>`).join('');
       const nc = t.newCat ? `<button class="choice new sug" style="--c:var(--rose)" data-act="confirm-new">+ Tạo “${esc(t.newCat)}”</button>` : '';
       return `<div class="rv" data-id="${esc(t.id)}">
@@ -1390,7 +1391,8 @@ function reviewHtml() {
         <div class="meta num">${t.date ? esc(fmtDate(t.date)) : 'Chưa có ngày'}${t.time ? ' · ' + t.time : ''}${t.priority === 'urgent' ? ' <span class="pill urgent">Gấp</span>' : t.priority === 'high' ? ' <span class="pill high">Quan trọng</span>' : ''}${t.isExample ? ' <span class="pill ex">ví dụ</span>' : ''}</div></div>
         <div class="row" style="flex-wrap:nowrap"><button class="btn ghost sm" data-act="edit">Sửa</button><button class="btn ghost sm" data-act="discard">Bỏ</button></div></div>
         ${t.aiReason ? `<div class="why">AI đoán: ${esc(t.aiReason)}</div>` : ''}
-        <div class="choices">${nc}${chips}</div></div>`; }).join('')}
+        <div class="choices">${nc}${chips}</div>
+        <div class="row rv-save"><button class="btn primary sm" ${t.newCat ? 'data-act="confirm-new"' : `data-act="confirm" data-cat="${esc(catOf(t).id)}"`}>Lưu · ${esc(t.newCat ? 'tạo “' + t.newCat + '”' : catOf(t).name)}</button></div></div>`; }).join('')}
   </section>`;
 }
 function exampleBanner() {
